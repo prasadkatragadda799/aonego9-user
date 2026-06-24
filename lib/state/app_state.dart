@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import '../data/app_data.dart';
+import '../data/user_repository.dart';
 
 /// Toast payload — title (t), body (b), icon (i).
 class ToastMsg {
@@ -50,6 +51,69 @@ class AppState extends ChangeNotifier {
 
   /// Inquiries the user has posted — kept so they are trackable end-to-end.
   final List<Inquiry> inquiries = [];
+
+  /// API repository — replaces static mock data with real HTTP calls.
+  final _repo = UserRepository();
+
+  /// Live listings loaded from the backend. When null, UI falls back to
+  /// the static [profiles] seed data (for offline / first-launch UX).
+  List<Map<String, dynamic>>? _apiListings;
+  List<Map<String, dynamic>>? _apiTickerEvents;
+
+  List<Map<String, dynamic>> get apiListings => _apiListings ?? [];
+  List<Map<String, dynamic>> get tickerEvents => _apiTickerEvents ?? [];
+
+  /// Fetch listings from the backend for the active category + location.
+  Future<void> fetchListings() async {
+    try {
+      final results = await _repo.listings(
+        category: activeCat,
+        city: location == 'All India' ? null : location,
+      );
+      _apiListings = results;
+      notifyListeners();
+    } catch (_) {
+      // fall back to static data silently
+    }
+  }
+
+  /// Fetch ticker events from the backend.
+  Future<void> fetchTickerEvents() async {
+    try {
+      _apiTickerEvents = await _repo.tickerEvents();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// Submit inquiry to the backend, then record locally.
+  Future<void> submitInquiryApi({
+    required String vendorId,
+    required String vendorName,
+    required String ref,
+    required String cat,
+    required bool urgent,
+    required String email,
+    required String phone,
+    required String date,
+    String message = '',
+  }) async {
+    try {
+      await _repo.submitInquiry(
+        vendorId: vendorId,
+        category: cat,
+        name: vendorName,
+        email: email,
+        phone: phone,
+        date: date,
+        inquiryRef: ref,
+        message: message,
+        urgent: urgent,
+      );
+    } catch (_) {
+      // non-blocking — inquiry is recorded locally regardless
+    }
+    submitInquiry(ref: ref, vendorName: vendorName, cat: cat, urgent: urgent);
+  }
 
   /// ── Reach / share analytics ───────────────────────────────────
   /// Live increments per profile id. Seeded with a deterministic base so
