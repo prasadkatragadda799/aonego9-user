@@ -141,6 +141,12 @@ class BrowseScreen extends StatelessWidget {
 
   Widget _grid(BuildContext context, AppState app, Color accent, List<Map<String, dynamic>> items, double w) {
     final pad = isNarrow(context) ? 16.0 : 20.0;
+    if (items.isEmpty && app.listingsLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 80),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: T.gold)),
+      );
+    }
     if (items.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 20),

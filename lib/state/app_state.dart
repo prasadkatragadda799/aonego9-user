@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import '../data/api_client.dart';
-import '../data/app_data.dart';
 import '../data/user_repository.dart';
 
 /// Toast payload — title (t), body (b), icon (i).
