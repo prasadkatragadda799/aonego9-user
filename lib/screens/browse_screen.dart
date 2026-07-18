@@ -105,7 +105,7 @@ class BrowseScreen extends StatelessWidget {
               _CTab(
                 cat: c,
                 active: app.activeCat == c['id'],
-                count: app.availableInCat(app.location, c['id'] as String),
+                count: app.knownCategoryCount(c['id'] as String),
                 onTap: () => app.switchCat(c['id'] as String),
               ),
               const SizedBox(width: 8),
@@ -344,7 +344,7 @@ class _GoldBtn extends StatelessWidget {
 class _CTab extends StatelessWidget {
   final Map cat;
   final bool active;
-  final int count;
+  final int? count; // null = not fetched yet (this category hasn't been opened this session)
   final VoidCallback onTap;
   const _CTab({required this.cat, required this.active, required this.count, required this.onTap});
   @override
@@ -370,7 +370,7 @@ class _CTab extends StatelessWidget {
               Text('${cat['icon']} ${cat['name']}',
                   style: F.syne(size: 12, weight: FontWeight.w700, color: active ? accent : T.mut)),
               const SizedBox(width: 8),
-              Text('$count', style: F.mono(size: 10, color: none ? T.dim : accent)),
+              Text(count == null ? '–' : '$count', style: F.mono(size: 10, color: none ? T.dim : accent)),
             ],
           ),
         ),
@@ -407,9 +407,6 @@ class _LocationChip extends StatelessWidget {
                     size: 16, color: c == app.location ? T.gold : T.mut),
                 const SizedBox(width: 10),
                 Text(c, style: F.syne(size: 13, weight: FontWeight.w700, color: c == app.location ? T.cream : T.text)),
-                const SizedBox(width: 18),
-                const Spacer(),
-                Text('${app.availableIn(c)}', style: F.mono(size: 11, color: c == app.location ? T.gold : T.dim)),
               ],
             ),
           ),
