@@ -392,7 +392,7 @@ class AppState extends ChangeNotifier {
   void switchCat(String id) {
     activeCat = id;
     filter = 'All';
-    _apiListings = null; // clear so UI shows static while re-fetching
+    _apiListings = null; // clear so UI shows a loading state while re-fetching
     notifyListeners();
     fetchListings();
   }
