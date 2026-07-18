@@ -342,38 +342,10 @@ class AppState extends ChangeNotifier {
   /// genuinely no vendors yet — never backfilled with placeholder profiles.
   List<Map<String, dynamic>> get catItems => _apiListings ?? [];
 
-  /// ── Location filtering ────────────────────────────────────────
-  /// Normalise a free-text location ("Bandra, Mumbai", "Pan India") to a key.
-  String _cityKey(String loc) {
-    final l = loc.toLowerCase();
-    if (l.contains('mumbai')) return 'mumbai';
-    if (l.contains('delhi')) return 'delhi';
-    if (l.contains('bangalore') || l.contains('bengaluru')) return 'bangalore';
-    if (l.contains('pan india') || l.contains('all india') || l.contains('india')) return 'all';
-    return l.trim();
-  }
-
-  /// Does this profile serve [city]? Pan-India profiles serve everywhere.
-  bool servesCity(Map<String, dynamic> p, String city) {
-    if (city == 'All India') return true;
-    final pk = _cityKey((p['loc'] ?? '').toString());
-    if (pk == 'all') return true;
-    return pk == _cityKey(city);
-  }
-
-  bool servesLocation(Map<String, dynamic> p) => servesCity(p, location);
-
-  /// Total profiles available in [city] (any category).
-  int availableIn(String city) => allProfiles.where((p) => servesCity(p, city)).length;
-
-  /// Profiles available in [city] within [catId] — for location-aware tabs.
-  int availableInCat(String city, String catId) =>
-      allProfiles.where((p) => p['cat'] == catId && servesCity(p, city)).length;
-
   void setLocation(String city) {
     if (location == city) return;
     location = city;
-    _apiListings = null; // clear so UI shows static while re-fetching
+    _apiListings = null; // clear so UI shows a loading state while re-fetching
     notifyListeners();
     fetchListings();
   }
