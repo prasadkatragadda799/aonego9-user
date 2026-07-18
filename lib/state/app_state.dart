@@ -336,27 +336,6 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// allProfiles = static PROFILES + published vendor profiles (mapped).
-  List<Map<String, dynamic>> get allProfiles => [
-        ...profiles,
-        ...vendorProfiles.map((vp) => {
-              ...vp,
-              'id': 'vp-${vp['name']}',
-              'rating': 4.5,
-              'reviewCount': 0,
-              'verified': false,
-              'tags': <String>[],
-              'isNew': true,
-              'revList': <dynamic>[],
-              'stats': [
-                {'n': 'New', 'l': 'Profile'},
-                {'n': '0', 'l': 'Reviews'},
-                {'n': 'Just', 'l': 'Published'},
-                {'n': '—', 'l': 'Rating'},
-              ],
-            }),
-      ];
-
   /// Real listings for the active category, straight from the backend.
   /// [_apiListings] is always scoped to [activeCat] already (that's what
   /// gets requested), so no further filtering is needed here. Empty means
