@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
 import '../data/app_data.dart';
+import '../data/user_repository.dart';
 import '../state/app_state.dart';
 import 'form_fields.dart';
 
@@ -11,8 +12,9 @@ class LeadForm extends StatefulWidget {
   final String name;
   final String cat;
   final Color accent;
+  final String vendorId;
   final VoidCallback? onDone;
-  const LeadForm({super.key, required this.name, required this.cat, required this.accent, this.onDone});
+  const LeadForm({super.key, required this.name, required this.cat, required this.accent, this.vendorId = '', this.onDone});
 
   @override
   State<LeadForm> createState() => _LeadFormState();
@@ -21,11 +23,31 @@ class LeadForm extends StatefulWidget {
 class _LeadFormState extends State<LeadForm> {
   bool _urg = false;
   bool _done = false;
+  bool _submitting = false;
   bool _advancePaid = false;
+  String _error = '';
   late final String _ref =
       'AO9-${(Random().nextInt(1 << 30)).toRadixString(36).toUpperCase().padLeft(6, '0').substring(0, 6)}';
 
-  void _payAdvance() {
+  // Form controllers
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+  final _email = TextEditingController();
+  final _date = TextEditingController();
+  final _message = TextEditingController();
+  String _inqType = '';
+  String _budget = '';
+
+  final _repo = UserRepository();
+
+  @override
+  void dispose() {
+    _name.dispose(); _phone.dispose(); _email.dispose();
+    _date.dispose(); _message.dispose();
+    super.dispose();
+  }
+
+  Future<void> _payAdvance() async {
     context.read<AppState>().payAdvance(_ref);
     setState(() => _advancePaid = true);
   }
@@ -69,17 +91,39 @@ class _LeadFormState extends State<LeadForm> {
     ]);
   }
 
-  void _submit() {
-    // Record the inquiry so it is trackable, and raise the vendor/admin
-    // "Requested" booking that carries this same reference.
-    context.read<AppState>().submitInquiry(
-          ref: _ref,
-          vendorName: widget.name,
-          cat: widget.cat,
-          urgent: _urg,
-        );
-    setState(() => _done = true);
-    widget.onDone?.call();
+  Future<void> _submit() async {
+    if (_name.text.trim().isEmpty || _phone.text.trim().isEmpty || _email.text.trim().isEmpty) {
+      setState(() => _error = 'Please fill in Name, Phone and Email.');
+      return;
+    }
+    setState(() { _submitting = true; _error = ''; });
+    try {
+      // Hit the backend inquiry endpoint
+      await _repo.submitInquiry(
+        vendorId: widget.vendorId,
+        category: widget.cat,
+        name: _name.text.trim(),
+        email: _email.text.trim(),
+        phone: _phone.text.trim(),
+        date: _date.text.trim().isEmpty ? DateTime.now().toIso8601String() : _date.text.trim(),
+        inquiryRef: _ref,
+        message: _message.text.trim().isEmpty ? '$_inqType · $_budget' : _message.text.trim(),
+        urgent: _urg,
+      );
+    } catch (_) {
+      // Non-blocking — inquiry is still tracked locally even if API fails
+    }
+    // Always record locally and show success
+    if (mounted) {
+      context.read<AppState>().submitInquiry(
+        ref: _ref,
+        vendorName: widget.name,
+        cat: widget.cat,
+        urgent: _urg,
+      );
+      setState(() { _done = true; _submitting = false; });
+      widget.onDone?.call();
+    }
   }
 
   @override
@@ -122,32 +166,46 @@ class _LeadFormState extends State<LeadForm> {
     }
 
     final inqOptions = inqTypes[widget.cat] ?? inqTypes['events']!;
+    if (_inqType.isEmpty) _inqType = inqOptions.first;
+    if (_budget.isEmpty) _budget = budgetRanges.first;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_error.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: T.red.withOpacity(.08),
+                border: Border.all(color: T.red.withOpacity(.3)),
+                borderRadius: BorderRadius.circular(7),
+              ),
+              child: Text(_error, style: F.syne(size: 12, color: T.red)),
+            ),
+          ],
           Row(children: [
-            Expanded(child: Field('Full Name *', const Fi('Your name'))),
+            Expanded(child: Field('Full Name *', Fi('Your name', controller: _name))),
             const SizedBox(width: 9),
-            Expanded(child: Field('Phone *', const Fi('+91 00000 00000'))),
+            Expanded(child: Field('Phone *', Fi('+91 00000 00000', controller: _phone, keyboardType: TextInputType.phone))),
           ]),
           const SizedBox(height: 11),
-          Field('Email *', const Fi('you@email.com', keyboardType: TextInputType.emailAddress)),
+          Field('Email *', Fi('you@email.com', controller: _email, keyboardType: TextInputType.emailAddress)),
           const SizedBox(height: 11),
           Row(children: [
-            Expanded(child: Field('Preferred Date', const Fi('dd / mm / yyyy'))),
+            Expanded(child: Field('Preferred Date', Fi('dd / mm / yyyy', controller: _date))),
             const SizedBox(width: 9),
             Expanded(child: Field('Location', const Fi('City...'))),
           ]),
           const SizedBox(height: 11),
-          Field('Inquiry Type', FiSelect(options: inqOptions)),
+          Field('Inquiry Type', FiSelect(options: inqOptions, onChanged: (v) => _inqType = v ?? inqOptions.first)),
           const SizedBox(height: 11),
-          Field('Budget Range', const FiSelect(options: budgetRanges)),
+          Field('Budget Range', FiSelect(options: budgetRanges, onChanged: (v) => _budget = v ?? budgetRanges.first)),
           const SizedBox(height: 11),
           Field('Message / Requirements',
-              const Fi('Describe your requirement — project type, dates, specific needs, references...', minLines: 3)),
+              Fi('Describe your requirement — project type, dates, specific needs, references...', minLines: 3, controller: _message)),
           const SizedBox(height: 11),
           // Urgent toggle
           GestureDetector(
@@ -179,7 +237,7 @@ class _LeadFormState extends State<LeadForm> {
             ),
           ),
           const SizedBox(height: 11),
-          _SubmitButton(accent: widget.accent, onTap: _submit),
+          _SubmitButton(accent: widget.accent, onTap: _submitting ? null : _submit, loading: _submitting),
           const SizedBox(height: 7),
           Text('Posted to ${widget.name} + AOneGo9 admin · Response in 2–4 hrs',
               textAlign: TextAlign.center,
@@ -215,8 +273,9 @@ class _Toggle extends StatelessWidget {
 
 class _SubmitButton extends StatelessWidget {
   final Color accent;
-  final VoidCallback onTap;
-  const _SubmitButton({required this.accent, required this.onTap});
+  final VoidCallback? onTap;
+  final bool loading;
+  const _SubmitButton({required this.accent, required this.onTap, this.loading = false});
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -225,8 +284,13 @@ class _SubmitButton extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 13),
         alignment: Alignment.center,
-        decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(8)),
-        child: Text('Send Inquiry →', style: F.syne(size: 14, weight: FontWeight.w700, color: T.bg)),
+        decoration: BoxDecoration(
+          color: loading ? accent.withOpacity(0.6) : accent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: loading
+            ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : Text('Send Inquiry →', style: F.syne(size: 14, weight: FontWeight.w700, color: T.bg)),
       ),
     );
   }

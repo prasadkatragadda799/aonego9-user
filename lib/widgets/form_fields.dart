@@ -22,17 +22,19 @@ const _fiFocus = OutlineInputBorder(
   borderRadius: BorderRadius.all(Radius.circular(7)),
 );
 
-/// `.fi` — text input.
+/// `.fi` — text input. Pass [controller] to read the value.
 class Fi extends StatelessWidget {
   final String placeholder;
   final bool obscure;
   final int minLines;
   final TextInputType? keyboardType;
+  final TextEditingController? controller;
   const Fi(this.placeholder,
-      {super.key, this.obscure = false, this.minLines = 1, this.keyboardType});
+      {super.key, this.obscure = false, this.minLines = 1, this.keyboardType, this.controller});
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller,
       obscureText: obscure,
       minLines: minLines,
       maxLines: obscure ? 1 : (minLines > 1 ? minLines + 3 : 1),

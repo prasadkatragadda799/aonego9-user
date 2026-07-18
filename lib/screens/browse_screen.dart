@@ -267,6 +267,11 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
                   _GhostBtn(label: 'Vendor Portal', onTap: () => app.setView('vendor-auth')),
                   const SizedBox(width: 8),
                 ],
+                _GhostBtn(
+                  label: app.isLoggedIn ? (app.currentUser?['name']?.toString().split(' ').first ?? 'Account') : 'Sign In',
+                  onTap: () => app.setView('account'),
+                ),
+                const SizedBox(width: 8),
                 _GoldBtn(
                   label: 'Enquire',
                   color: accent,

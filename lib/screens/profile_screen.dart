@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
 import '../data/app_data.dart';
+import '../data/user_repository.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
 import '../widgets/lead_form.dart';
@@ -23,9 +24,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late String _tab;
   bool _leadSent = false;
   final _scrollKey = GlobalKey();
+  final _repo = UserRepository();
+
+  // Real packages loaded from backend; null = still loading, [] = none/failed
+  List<Map<String, dynamic>>? _apiPackages;
 
   Map<String, dynamic> get p => widget.profile;
-  String get cat => p['cat'] as String;
+  String get cat => p['cat'] as String? ?? '';
   bool get isModel => cat == 'modelF' || cat == 'modelM';
   bool get isVenue => cat == 'venue';
   bool get isEvent => cat == 'events';
@@ -43,6 +48,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ? ['Spaces', 'Portfolio', 'Packages', 'Availability', 'Reviews']
                 : ['Portfolio', 'About', 'Equipment', 'Packages', 'Reviews'];
     _tab = _tabs.first;
+    _fetchPackages();
+  }
+
+  Future<void> _fetchPackages() async {
+    final vendorId = p['id'] as String? ?? '';
+    if (vendorId.isEmpty) { setState(() => _apiPackages = []); return; }
+    try {
+      final pkgs = await _repo.vendorPackages(vendorId);
+      if (mounted) setState(() => _apiPackages = pkgs);
+    } catch (_) {
+      if (mounted) setState(() => _apiPackages = []);
+    }
   }
 
   void _toast(String t, String b, String i) => context.read<AppState>().showToast(t, b, i);
@@ -382,7 +399,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-          LeadForm(name: p['name'], cat: cat, accent: accent, onDone: () => setState(() => _leadSent = true)),
+          LeadForm(
+            name: p['name'] as String? ?? '',
+            cat: cat,
+            accent: accent,
+            vendorId: p['id'] as String? ?? '',
+            onDone: () => setState(() => _leadSent = true),
+          ),
         ],
       ),
     );
@@ -866,11 +889,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _packages() {
-    final pkgs = (p['packages'] as List?)?.cast<Map>() ?? [];
+    // Prefer live backend packages; fall back to static profile data while loading
+    final pkgs = (_apiPackages ?? (p['packages'] as List?)?.cast<Map>() ?? []);
     final featTwoCol = screenW(context) > 768;
     return Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const BlkHeader('Packages & Pricing'),
-      for (final pk in pkgs)
+      if (_apiPackages == null)
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        )
+      else if (pkgs.isEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Text('No packages listed yet.', style: F.syne(size: 13, color: T.mut)),
+        )
+      else for (final pk in pkgs)
         HoverFx(
           onTap: () => _toast('Package noted', pk['name'] ?? '', '✓'),
           builder: (h) => Container(

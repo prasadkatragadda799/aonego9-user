@@ -64,7 +64,27 @@ class UserRepository {
   // GET /api/v1/vendors/public/{id}
   Future<Map<String, dynamic>> vendorProfile(String vendorId) async {
     final data = await ApiClient.get('/vendors/public/$vendorId');
-    return data;
+    return data as Map<String, dynamic>;
+  }
+
+  // GET /api/v1/vendors/public/{id}/packages
+  // Returns the vendor's active packages formatted for the profile screen's
+  // p['packages'] list — keys: name, price (formatted ₹), span, feats, pop.
+  Future<List<Map<String, dynamic>>> vendorPackages(String vendorId) async {
+    final data = await ApiClient.get('/vendors/public/$vendorId/packages') as List;
+    return data.map((j) {
+      final price = (j['price'] as num).toDouble();
+      final priceStr = '₹${price.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
+      return {
+        'name': j['title'] ?? '',
+        'price': priceStr,
+        'span': ' / ${j['unit'] ?? ''}',
+        'feats': (j['description'] as String? ?? '').split('.').where((s) => s.trim().isNotEmpty).map((s) => s.trim()).toList(),
+        'pop': false,
+        'id': j['id'],
+        'bookingsCount': j['bookings_count'] ?? 0,
+      };
+    }).toList();
   }
 
   // ── Inquiries ─────────────────────────────────────────────────
@@ -116,7 +136,10 @@ class UserRepository {
   // ── User profile ──────────────────────────────────────────────
 
   // GET /api/v1/users/me
-  Future<Map<String, dynamic>> myProfile() async => ApiClient.get('/users/me');
+  Future<Map<String, dynamic>> myProfile() async {
+    final data = await ApiClient.get('/users/me');
+    return data as Map<String, dynamic>;
+  }
 
   // GET /api/v1/bookings/me
   Future<List<Map<String, dynamic>>> myBookings() async {

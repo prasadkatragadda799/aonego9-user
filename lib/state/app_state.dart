@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import '../data/api_client.dart';
 import '../data/app_data.dart';
 import '../data/user_repository.dart';
 
@@ -55,6 +56,78 @@ class AppState extends ChangeNotifier {
   /// API repository — replaces static mock data with real HTTP calls.
   final _repo = UserRepository();
 
+  /// ── Customer session ──────────────────────────────────────────
+  Map<String, dynamic>? currentUser;
+  bool get isLoggedIn => currentUser != null;
+  String? authError;
+  bool authBusy = false;
+
+  /// Restore a session from a previously-saved token (called on startup).
+  Future<void> restoreSession() async {
+    if (!await ApiClient.isLoggedIn()) return;
+    try {
+      currentUser = await _repo.myProfile();
+      notifyListeners();
+    } catch (_) {
+      // stale/expired token — clear it silently
+      await _repo.logout();
+    }
+  }
+
+  Future<bool> loginUser(String email, String password) async {
+    authBusy = true;
+    authError = null;
+    notifyListeners();
+    try {
+      await _repo.login(email, password);
+      currentUser = await _repo.myProfile();
+      authBusy = false;
+      view = 'browse';
+      notifyListeners();
+      showToast('Welcome back', currentUser?['name'] ?? '', '👋');
+      return true;
+    } catch (e) {
+      authBusy = false;
+      authError = e is ApiException ? e.message : 'Login failed — check your details and try again';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> registerUser({
+    required String name,
+    required String email,
+    required String password,
+    String phone = '',
+    String city = '',
+  }) async {
+    authBusy = true;
+    authError = null;
+    notifyListeners();
+    try {
+      await _repo.register(name: name, email: email, password: password, phone: phone, city: city);
+      currentUser = await _repo.myProfile();
+      authBusy = false;
+      view = 'browse';
+      notifyListeners();
+      showToast('Account created', 'Welcome to AOneGo9, $name', '🎉');
+      return true;
+    } catch (e) {
+      authBusy = false;
+      authError = e is ApiException ? e.message : 'Registration failed — please try again';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> logoutUser() async {
+    await _repo.logout();
+    currentUser = null;
+    view = 'browse';
+    notifyListeners();
+    showToast('Signed out', 'See you again soon', '👋');
+  }
+
   /// Live listings loaded from the backend. When null, UI falls back to
   /// the static [profiles] seed data (for offline / first-launch UX).
   List<Map<String, dynamic>>? _apiListings;
@@ -63,14 +136,15 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> get apiListings => _apiListings ?? [];
   List<Map<String, dynamic>> get tickerEvents => _apiTickerEvents ?? [];
 
-  /// Fetch listings from the backend for the active category + location.
+  /// Fetch listings from the backend and normalise each vendor map so the
+  /// existing UI widgets (ListingCard, ProfileScreen) work without changes.
   Future<void> fetchListings() async {
     try {
       final results = await _repo.listings(
         category: activeCat,
         city: location == 'All India' ? null : location,
       );
-      _apiListings = results;
+      _apiListings = results.map(_normaliseVendor).toList();
       notifyListeners();
     } catch (_) {
       // fall back to static data silently
@@ -83,6 +157,46 @@ class AppState extends ChangeNotifier {
       _apiTickerEvents = await _repo.tickerEvents();
       notifyListeners();
     } catch (_) {}
+  }
+
+  /// Map a backend vendor JSON to the shape the UI expects.
+  static Map<String, dynamic> _normaliseVendor(Map<String, dynamic> v) {
+    // Map backend category string → user app cat id
+    final rawCat = (v['category'] as String? ?? '').toLowerCase();
+    String cat = 'modelF';
+    if (rawCat.contains('photo')) cat = 'photo';
+    else if (rawCat.contains('video')) cat = 'video';
+    else if (rawCat.contains('venue')) cat = 'venue';
+    else if (rawCat.contains('event')) cat = 'events';
+    else if (rawCat.contains('male')) cat = 'modelM';
+
+    final name = v['name'] as String? ?? v['company'] as String? ?? '';
+    final city = v['city'] as String? ?? '';
+    final rating = (v['rating'] as num?)?.toDouble() ?? 0.0;
+    final bookings = (v['total_bookings'] as num?)?.toInt() ?? 0;
+
+    return {
+      'id': v['id'] ?? '',
+      'cat': cat,
+      'name': name,
+      'loc': city,
+      'rating': rating,
+      'reviewCount': bookings,
+      'verified': true,
+      'tags': <String>[],
+      'badge': v['plan'] ?? 'Starter',
+      'tagline': v['bio'] as String? ?? '',
+      'stats': [
+        {'n': '$bookings', 'l': 'Bookings'},
+        {'n': rating.toStringAsFixed(1), 'l': 'Rating'},
+        {'n': city, 'l': 'City'},
+        {'n': v['plan'] ?? 'Starter', 'l': 'Plan'},
+      ],
+      'revList': <dynamic>[],
+      'isNew': bookings == 0,
+      // keep raw backend fields for profile screen deep-dive
+      '_raw': v,
+    };
   }
 
   /// Submit inquiry to the backend, then record locally.
@@ -152,6 +266,10 @@ class AppState extends ChangeNotifier {
 
   AppState() {
     _initFromUrl();
+    // Kick off API fetches immediately on startup
+    fetchListings();
+    fetchTickerEvents();
+    restoreSession();
   }
 
   /// Optional deep-link via URL fragment (e.g. #profile/mf1, #vendor-dash).
@@ -210,9 +328,18 @@ class AppState extends ChangeNotifier {
             }),
       ];
 
-  /// Items in the active category that are available in the chosen location.
-  List<Map<String, dynamic>> get catItems =>
-      allProfiles.where((p) => p['cat'] == activeCat && servesLocation(p)).toList();
+  /// Items in the active category — API results first, static profiles as fallback.
+  List<Map<String, dynamic>> get catItems {
+    // If the API returned results for this category, use them
+    final fromApi = _apiListings
+        ?.where((p) => p['cat'] == activeCat)
+        .toList();
+    if (fromApi != null && fromApi.isNotEmpty) return fromApi;
+    // Fall back to static data while loading or if API returned nothing
+    return allProfiles
+        .where((p) => p['cat'] == activeCat && servesLocation(p))
+        .toList();
+  }
 
   /// ── Location filtering ────────────────────────────────────────
   /// Normalise a free-text location ("Bandra, Mumbai", "Pan India") to a key.
@@ -245,7 +372,9 @@ class AppState extends ChangeNotifier {
   void setLocation(String city) {
     if (location == city) return;
     location = city;
+    _apiListings = null; // clear so UI shows static while re-fetching
     notifyListeners();
+    fetchListings();
   }
 
   void showToast(String t, String b, [String i = '✅']) {
@@ -290,7 +419,9 @@ class AppState extends ChangeNotifier {
   void switchCat(String id) {
     activeCat = id;
     filter = 'All';
+    _apiListings = null; // clear so UI shows static while re-fetching
     notifyListeners();
+    fetchListings();
   }
 
   void setFilter(String f) {
