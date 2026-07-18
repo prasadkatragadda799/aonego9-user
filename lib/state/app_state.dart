@@ -128,10 +128,12 @@ class AppState extends ChangeNotifier {
     showToast('Signed out', 'See you again soon', '👋');
   }
 
-  /// Live listings loaded from the backend. When null, UI falls back to
-  /// the static [profiles] seed data (for offline / first-launch UX).
+  /// Live listings loaded from the backend for the active category. Null
+  /// while the first fetch for this category is still in flight; an empty
+  /// list is a genuine "nothing here yet" — never backfilled with fake data.
   List<Map<String, dynamic>>? _apiListings;
   List<Map<String, dynamic>>? _apiTickerEvents;
+  bool listingsLoading = false;
 
   List<Map<String, dynamic>> get apiListings => _apiListings ?? [];
   List<Map<String, dynamic>> get tickerEvents => _apiTickerEvents ?? [];
@@ -139,15 +141,19 @@ class AppState extends ChangeNotifier {
   /// Fetch listings from the backend and normalise each vendor map so the
   /// existing UI widgets (ListingCard, ProfileScreen) work without changes.
   Future<void> fetchListings() async {
+    listingsLoading = true;
+    notifyListeners();
     try {
       final results = await _repo.listings(
         category: activeCat,
         city: location == 'All India' ? null : location,
       );
       _apiListings = results.map(_normaliseVendor).toList();
-      notifyListeners();
     } catch (_) {
-      // fall back to static data silently
+      _apiListings = [];
+    } finally {
+      listingsLoading = false;
+      notifyListeners();
     }
   }
 
@@ -328,18 +334,11 @@ class AppState extends ChangeNotifier {
             }),
       ];
 
-  /// Items in the active category — API results first, static profiles as fallback.
-  List<Map<String, dynamic>> get catItems {
-    // If the API returned results for this category, use them
-    final fromApi = _apiListings
-        ?.where((p) => p['cat'] == activeCat)
-        .toList();
-    if (fromApi != null && fromApi.isNotEmpty) return fromApi;
-    // Fall back to static data while loading or if API returned nothing
-    return allProfiles
-        .where((p) => p['cat'] == activeCat && servesLocation(p))
-        .toList();
-  }
+  /// Real listings for the active category, straight from the backend.
+  /// [_apiListings] is always scoped to [activeCat] already (that's what
+  /// gets requested), so no further filtering is needed here. Empty means
+  /// genuinely no vendors yet — never backfilled with placeholder profiles.
+  List<Map<String, dynamic>> get catItems => _apiListings ?? [];
 
   /// ── Location filtering ────────────────────────────────────────
   /// Normalise a free-text location ("Bandra, Mumbai", "Pan India") to a key.
