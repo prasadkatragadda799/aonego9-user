@@ -315,13 +315,7 @@ class AppState extends ChangeNotifier {
         break;
       case 'profile':
         final id = parts.length > 1 ? parts[1] : '';
-        final found = profiles.firstWhere((p) => p['id'] == id, orElse: () => const {});
-        if (found.isNotEmpty) {
-          selectedProfile = found;
-          view = 'profile';
-          activeCat = found['cat'] as String;
-          _views[id] = (_views[id] ?? 0) + 1; // arriving via a shared link is a view
-        }
+        if (id.isNotEmpty) _openSharedProfile(id);
         break;
       case 'vendor-auth':
         view = 'vendor-auth';
@@ -333,6 +327,23 @@ class AppState extends ChangeNotifier {
       case 'vendor-edit':
         view = 'vendor-edit';
         break;
+    }
+  }
+
+  /// Resolves a shared profile link (?go=profile/<vendor-id>) against the
+  /// real backend. Runs async since the constructor can't await it —
+  /// silently stays on the default browse view if the id doesn't exist.
+  Future<void> _openSharedProfile(String id) async {
+    try {
+      final vendor = await _repo.vendorProfile(id);
+      final normalised = _normaliseVendor(vendor);
+      selectedProfile = normalised;
+      view = 'profile';
+      activeCat = normalised['cat'] as String;
+      _views[id] = (_views[id] ?? 0) + 1; // arriving via a shared link is a view
+      notifyListeners();
+    } catch (_) {
+      // unknown/invalid id — stay on the default browse view
     }
   }
 
