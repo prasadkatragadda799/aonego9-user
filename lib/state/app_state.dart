@@ -135,8 +135,30 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>>? _apiTickerEvents;
   bool listingsLoading = false;
 
+  /// Real per-category listing counts, filled in as each category is
+  /// visited this session. Never guessed/faked — a category the user
+  /// hasn't opened yet just has no entry (see [knownCategoryCount]).
+  final Map<String, int> _categoryCounts = {};
+  int? knownCategoryCount(String catId) => _categoryCounts[catId];
+
   List<Map<String, dynamic>> get apiListings => _apiListings ?? [];
   List<Map<String, dynamic>> get tickerEvents => _apiTickerEvents ?? [];
+
+  /// Vendors self-report a free-text category at registration (e.g.
+  /// "Photography"), matched case-insensitively as a substring by the
+  /// backend. The app's internal category ids don't all line up with that
+  /// text 1:1, so map to a term that actually appears in real vendor data.
+  /// Note: the backend has no gender field on vendors, so "Female Models"
+  /// and "Male Models" both search the same "talent" term — there's no way
+  /// to tell them apart server-side with the current schema.
+  static String _searchTermFor(String catId) => switch (catId) {
+        'photo' => 'photography',
+        'video' => 'videography',
+        'venue' => 'venue',
+        'events' => 'event',
+        'modelF' || 'modelM' => 'talent',
+        _ => catId,
+      };
 
   /// Fetch listings from the backend and normalise each vendor map so the
   /// existing UI widgets (ListingCard, ProfileScreen) work without changes.
@@ -145,10 +167,11 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       final results = await _repo.listings(
-        category: activeCat,
+        category: _searchTermFor(activeCat),
         city: location == 'All India' ? null : location,
       );
       _apiListings = results.map(_normaliseVendor).toList();
+      _categoryCounts[activeCat] = _apiListings!.length;
     } catch (_) {
       _apiListings = [];
     } finally {
