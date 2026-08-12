@@ -26,6 +26,7 @@ class _LeadFormState extends State<LeadForm> {
   bool _submitting = false;
   bool _advancePaid = false;
   String _error = '';
+  String? _bookingId;
   late final String _ref =
       'AO9-${(Random().nextInt(1 << 30)).toRadixString(36).toUpperCase().padLeft(6, '0').substring(0, 6)}';
 
@@ -48,8 +49,18 @@ class _LeadFormState extends State<LeadForm> {
   }
 
   Future<void> _payAdvance() async {
-    context.read<AppState>().payAdvance(_ref);
-    setState(() => _advancePaid = true);
+    final app = context.read<AppState>();
+    if (!app.isLoggedIn) {
+      setState(() => _error = 'Sign in to pay the advance and confirm your slot.');
+      return;
+    }
+    if (_bookingId == null || _bookingId!.isEmpty) {
+      setState(() => _error = 'Booking not found — please resubmit your inquiry.');
+      return;
+    }
+    setState(() => _error = '');
+    final ok = await app.payAdvanceApi(_bookingId!, _ref);
+    if (mounted && ok) setState(() => _advancePaid = true);
   }
 
   /// Advance / deposit affordance shown after an inquiry is sent — reserves
@@ -98,8 +109,7 @@ class _LeadFormState extends State<LeadForm> {
     }
     setState(() { _submitting = true; _error = ''; });
     try {
-      // Hit the backend inquiry endpoint
-      await _repo.submitInquiry(
+      final result = await _repo.submitInquiry(
         vendorId: widget.vendorId,
         category: widget.cat,
         name: _name.text.trim(),
@@ -110,6 +120,7 @@ class _LeadFormState extends State<LeadForm> {
         message: _message.text.trim().isEmpty ? '$_inqType · $_budget' : _message.text.trim(),
         urgent: _urg,
       );
+      _bookingId = result['booking_id'] as String?;
     } catch (_) {
       // Non-blocking — inquiry is still tracked locally even if API fails
     }

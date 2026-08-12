@@ -7,6 +7,7 @@ import 'screens/profile_screen.dart';
 import 'screens/vendor_screens.dart';
 import 'screens/auth_screen.dart';
 import 'screens/account_screen.dart';
+import 'screens/subscription_screen.dart';
 import 'widgets/toast.dart';
 
 void main() => runApp(const AOneGo9App());
@@ -52,20 +53,19 @@ class _Root extends StatelessWidget {
         }
         break;
       case 'vendor-auth':
-        body = const VendorAuth();
-        break;
       case 'vendor-dash':
-        body = const VendorDash();
-        toastAccent = T.gold;
-        break;
       case 'vendor-edit':
-        body = const VendorUpload();
+        body = const VendorPortalScreen();
+        toastAccent = T.gold;
         break;
       case 'login':
         body = const UserAuth();
         break;
       case 'account':
         body = app.isLoggedIn ? const AccountScreen() : const UserAuth();
+        break;
+      case 'subscription':
+        body = app.isLoggedIn ? const SubscriptionScreen() : const UserAuth();
         break;
       default:
         body = const BrowseScreen();

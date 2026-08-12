@@ -50,6 +50,7 @@ class UserRepository {
     final params = <String, String>{'page': '$page', 'page_size': '$pageSize'};
     if (category != null) params['category'] = category;
     if (city != null) params['city'] = city;
+    if (filter != null && filter.isNotEmpty) params['filter'] = filter;
     final query = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
     final data = await ApiClient.get('/browse/listings?$query') as List;
     return data.cast<Map<String, dynamic>>();
@@ -85,6 +86,71 @@ class UserRepository {
         'bookingsCount': j['bookings_count'] ?? 0,
       };
     }).toList();
+  }
+
+  // GET /api/v1/vendors/public/{id}/portfolio
+  Future<List<Map<String, dynamic>>> vendorPortfolio(String vendorId) async {
+    final data = await ApiClient.get('/vendors/public/$vendorId/portfolio') as List;
+    return data.map((j) {
+      final tag = j['tag'] as String? ?? '';
+      final type = (j['type'] as String? ?? '').isNotEmpty ? j['type'] as String : tag.toLowerCase();
+      final bg = (j['bg'] as num?)?.toInt() ?? 0;
+      final headline = j['headline'] as String? ?? '';
+      final desc = j['description'] as String? ?? '';
+      final emoji = j['emoji'] as String? ?? '🖼️';
+      return {
+        'label': tag,
+        'sub': headline,
+        'e': emoji,
+        'bg': bg,
+        'type': type,
+        'headline': headline,
+        'desc': desc,
+        'emoji': emoji,
+      };
+    }).toList();
+  }
+
+  // GET /api/v1/reviews/public/{id}
+  Future<Map<String, dynamic>> vendorReviews(String vendorId) async {
+    final data = await ApiClient.get('/reviews/public/$vendorId');
+    return data as Map<String, dynamic>;
+  }
+
+  // GET /api/v1/vendors/public/{id}/profile-details
+  Future<Map<String, dynamic>> vendorProfileDetails(String vendorId) async {
+    final data = await ApiClient.get('/vendors/public/$vendorId/profile-details');
+    return _mapProfileDetails(data as Map<String, dynamic>);
+  }
+
+  static Map<String, dynamic> _mapProfileDetails(Map<String, dynamic> data) {
+    final cc = (data['comp_card'] as Map?)?.cast<String, dynamic>() ?? {};
+    return {
+      'overview': data['overview'] ?? '',
+      'exp': data['experience'] ?? '',
+      'training': data['training'] ?? '',
+      'langs': data['languages'] ?? '',
+      'height': cc['height'] ?? '',
+      'weight': cc['weight'] ?? '',
+      'bust': cc['bust'] ?? '',
+      'chest': cc['chest'] ?? '',
+      'waist': cc['waist'] ?? '',
+      'hip': cc['hip'] ?? '',
+      'shoe': cc['shoe'] ?? '',
+      'age': cc['age'],
+      'hair': cc['hair'] ?? '',
+      'eye': cc['eye'] ?? '',
+      'skin': cc['skin'] ?? '',
+      'stats': data['stats'] ?? [],
+      'tags': data['tags'] ?? [],
+      'services': data['services'] ?? [],
+      'amenities': data['amenities'] ?? [],
+      'avail': data['availability'] ?? [],
+      'sceneData': data['scene_data'] ?? [],
+      'spaces': data['spaces'] ?? [],
+      'equipment': data['equipment'] ?? [],
+      'reels': data['reels'] ?? [],
+    };
   }
 
   // ── Inquiries ─────────────────────────────────────────────────
@@ -145,5 +211,45 @@ class UserRepository {
   Future<List<Map<String, dynamic>>> myBookings() async {
     final data = await ApiClient.get('/bookings/me') as Map;
     return (data['items'] as List).cast<Map<String, dynamic>>();
+  }
+
+  // ── Subscriptions ────────────────────────────────────────────
+
+  // GET /api/v1/subscriptions/plans?audience=user
+  Future<List<Map<String, dynamic>>> subscriptionPlans() async {
+    final data = await ApiClient.get('/subscriptions/plans?audience=user') as List;
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  // GET /api/v1/subscriptions/me — null if the user has no active subscription (404)
+  Future<Map<String, dynamic>?> currentSubscription() async {
+    try {
+      final data = await ApiClient.get('/subscriptions/me');
+      return data as Map<String, dynamic>;
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  // GET /api/v1/subscriptions/payment-info (public)
+  Future<Map<String, dynamic>> paymentInfo() async {
+    final data = await ApiClient.get('/subscriptions/payment-info');
+    return data as Map<String, dynamic>;
+  }
+
+  // POST /api/v1/subscriptions/request
+  Future<Map<String, dynamic>> requestSubscription(String planId, String receiptImageBase64) async {
+    final data = await ApiClient.post('/subscriptions/request', {
+      'plan_id': planId,
+      'receipt_image': receiptImageBase64,
+    });
+    return data as Map<String, dynamic>;
+  }
+
+  // GET /api/v1/subscriptions/requests/mine
+  Future<List<Map<String, dynamic>>> mySubscriptionRequests() async {
+    final data = await ApiClient.get('/subscriptions/requests/mine') as List;
+    return data.cast<Map<String, dynamic>>();
   }
 }

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
-import '../data/app_data.dart';
 import '../data/user_repository.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
@@ -28,8 +27,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // Real packages loaded from backend; null = still loading, [] = none/failed
   List<Map<String, dynamic>>? _apiPackages;
+  List<Map<String, dynamic>>? _apiPortfolio;
+  List<Map<String, dynamic>>? _apiReviews;
+  double? _apiReviewAvg;
+  late Map<String, dynamic> _mergedProfile;
+  bool _detailsLoaded = false;
 
-  Map<String, dynamic> get p => widget.profile;
+  Map<String, dynamic> get p => _mergedProfile;
   String get cat => p['cat'] as String? ?? '';
   bool get isModel => cat == 'modelF' || cat == 'modelM';
   bool get isVenue => cat == 'venue';
@@ -40,6 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _mergedProfile = Map<String, dynamic>.from(widget.profile);
     _tabs = isModel
         ? ['Gallery', 'Comp Card', 'Scene Availability', 'Packages', 'Reviews']
         : isEvent
@@ -49,6 +54,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 : ['Portfolio', 'About', 'Equipment', 'Packages', 'Reviews'];
     _tab = _tabs.first;
     _fetchPackages();
+    _fetchPortfolio();
+    _fetchReviews();
+    _fetchProfileDetails();
+  }
+
+  Future<void> _fetchProfileDetails() async {
+    final vendorId = widget.profile['id'] as String? ?? '';
+    if (vendorId.isEmpty) { setState(() => _detailsLoaded = true); return; }
+    try {
+      final details = await _repo.vendorProfileDetails(vendorId);
+      if (mounted) setState(() {
+        _mergedProfile = {..._mergedProfile, ...details};
+        _detailsLoaded = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _detailsLoaded = true);
+    }
+  }
+
+  Future<void> _fetchReviews() async {
+    final vendorId = p['id'] as String? ?? '';
+    if (vendorId.isEmpty) { setState(() { _apiReviews = []; _apiReviewAvg = 0; }); return; }
+    try {
+      final data = await _repo.vendorReviews(vendorId);
+      if (!mounted) return;
+      final items = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      setState(() {
+        _apiReviews = items.map((r) {
+          final stars = (r['stars'] as num?)?.toInt() ?? 0;
+          return {
+            'author': r['author'] ?? 'Client',
+            'role': '',
+            'stars': '★' * stars,
+            'text': r['text'] ?? '',
+          };
+        }).toList();
+        _apiReviewAvg = (data['average_rating'] as num?)?.toDouble() ?? 0;
+      });
+    } catch (_) {
+      if (mounted) setState(() { _apiReviews = []; _apiReviewAvg = 0; });
+    }
+  }
+
+  Future<void> _fetchPortfolio() async {
+    final vendorId = p['id'] as String? ?? '';
+    if (vendorId.isEmpty) { setState(() => _apiPortfolio = []); return; }
+    try {
+      final items = await _repo.vendorPortfolio(vendorId);
+      if (mounted) setState(() => _apiPortfolio = items);
+    } catch (_) {
+      if (mounted) setState(() => _apiPortfolio = []);
+    }
   }
 
   Future<void> _fetchPackages() async {
@@ -437,14 +494,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       case 'Gallery':
         return Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const BlkHeader('Portfolio Gallery'),
-          ModelGallery(items: (p['igPortfolio'] as List?)?.cast<Map<String, dynamic>>() ?? [], accent: accent, onToast: _toast),
+          if (_apiPortfolio == null)
+            const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+          else if (_apiPortfolio!.isEmpty)
+            Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Text('No portfolio works yet.', style: F.syne(size: 13, color: T.mut)))
+          else
+            ModelGallery(items: _apiPortfolio!, accent: accent, onToast: _toast),
         ]));
       case 'Comp Card':
         return _compCard();
       case 'Scene Availability':
         return Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const BlkHeader('Professional Scene Availability'),
-          SceneMatrix(sceneData: (p['sceneData'] as List?)?.cast<Map<String, dynamic>>() ?? [], accent: accent),
+          if (!_detailsLoaded)
+            const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+          else if (((p['sceneData'] as List?) ?? []).isEmpty)
+            Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Text('No scene availability listed yet.', style: F.syne(size: 13, color: T.mut)))
+          else
+            SceneMatrix(sceneData: (p['sceneData'] as List?)?.cast<Map<String, dynamic>>() ?? [], accent: accent),
         ]));
       case 'Portfolio':
         return _genPortfolio();
@@ -470,6 +537,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _compCard() {
+    if (!_detailsLoaded) {
+      return const Blk(child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ));
+    }
     final mF = cat == 'modelF';
     final meas = <List<String>>[
       ['Height', '${p['height']}'],
@@ -574,7 +647,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _genPortfolio() {
-    final port = (p['portfolio'] as List?)?.cast<Map>() ?? [];
+    final port = _apiPortfolio ?? (p['portfolio'] as List?)?.cast<Map>() ?? [];
+    if (_apiPortfolio == null) {
+      return const Blk(child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ));
+    }
+    if (port.isEmpty) {
+      return Blk(child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Text('No portfolio works yet.', style: F.syne(size: 13, color: T.mut)),
+      ));
+    }
     final cols = screenW(context) <= 480 ? 1 : (screenW(context) <= 768 ? 2 : 3);
     return Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const BlkHeader('Portfolio Gallery'),
@@ -636,15 +721,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _overview() {
-    final services = (p['services'] as List?)?.cast<String>();
+    if (!_detailsLoaded) {
+      return const Blk(child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ));
+    }
+    final services = (p['services'] as List?)?.cast<String>() ?? [];
+    final overview = p['overview'] as String? ?? '';
+    if (overview.isEmpty && services.isEmpty) {
+      return Blk(child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Text('No overview or services listed yet.', style: F.syne(size: 13, color: T.mut)),
+      ));
+    }
     const svcIcons = ['🎭', '🏆', '🏢', '🚀', '🎵', '🎓', '💒', '🎤'];
     return Column(children: [
-      if (p['overview'] != null)
+      if (overview.isNotEmpty)
         Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const BlkHeader('About'),
-          Text(p['overview'], style: F.syne(size: 14, weight: FontWeight.w400, color: T.mut, height: 1.75)),
+          Text(overview, style: F.syne(size: 14, weight: FontWeight.w400, color: T.mut, height: 1.75)),
         ])),
-      if (services != null)
+      if (services.isNotEmpty)
         Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const BlkHeader('Services We Manage'),
           Wrap(spacing: 7, runSpacing: 7, children: [
@@ -660,10 +758,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _equipment() {
-    final reels = (p['reels'] as List?)?.cast<Map>();
-    final equip = (p['equipment'] as List?)?.cast<Map>();
+    if (!_detailsLoaded) {
+      return const Blk(child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ));
+    }
+    final reels = (p['reels'] as List?)?.cast<Map>() ?? [];
+    final equip = (p['equipment'] as List?)?.cast<Map>() ?? [];
+    if (reels.isEmpty && equip.isEmpty) {
+      return Blk(child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Text('No equipment or showreels listed yet.', style: F.syne(size: 13, color: T.mut)),
+      ));
+    }
     return Column(children: [
-      if (isVideo && reels != null)
+      if (isVideo && reels.isNotEmpty)
         Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const BlkHeader('Showreels & Samples'),
           for (final r in reels)
@@ -693,7 +803,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
         ])),
-      if (equip != null)
+      if (equip.isNotEmpty)
         Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const BlkHeader('Equipment & Technology'),
           for (int i = 0; i < equip.length; i++)
@@ -722,8 +832,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _spaces() {
+    if (!_detailsLoaded) {
+      return const Blk(child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ));
+    }
     final spaces = (p['spaces'] as List?)?.cast<Map>() ?? [];
     final amenities = (p['amenities'] as List?)?.cast<String>() ?? [];
+    if (spaces.isEmpty && amenities.isEmpty) {
+      return Blk(child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Text('No spaces or amenities listed yet.', style: F.syne(size: 13, color: T.mut)),
+      ));
+    }
     final twoCol = screenW(context) > 768;
     return Column(children: [
       Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -779,7 +901,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _availability() {
+    if (!_detailsLoaded) {
+      return const Blk(child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ));
+    }
     final avail = (p['avail'] as List?)?.cast<String>() ?? [];
+    if (avail.isEmpty) {
+      return Blk(child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Text('No availability calendar published yet.', style: F.syne(size: 13, color: T.mut)),
+      ));
+    }
     final legend = [
       [T.grn, T.grn.withOpacity(.3), 'Open'],
       [T.red, T.red.withOpacity(.2), 'Booked'],
@@ -969,9 +1103,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _reviews() {
-    final revs = (p['revList'] as List?)?.cast<Map>() ?? [];
-    final reviewCount = (p['reviewCount'] as num?)?.toInt() ?? 0;
-    const bd = [[5, 82], [4, 12], [3, 4], [2, 1], [1, 1]];
+    if (_apiReviews == null) {
+      return const Blk(child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ));
+    }
+    final revs = _apiReviews!;
+    final avgRating = _apiReviewAvg ?? ((p['rating'] as num?)?.toDouble() ?? 0);
+    final reviewCount = revs.length;
+    if (revs.isEmpty) {
+      return Blk(child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Text('No reviews yet.', style: F.syne(size: 13, color: T.mut)),
+      ));
+    }
+    final bd = _starDistribution(revs);
     final twoCol = screenW(context) > 768;
     return Column(children: [
       // summary
@@ -980,7 +1127,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(color: T.surf, border: Border.all(color: T.bdr), borderRadius: BorderRadius.circular(10)),
         child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-          Text('${p['rating']}', style: F.fraunces(size: 52, weight: FontWeight.w700, color: accent, height: 1)),
+          Text('${avgRating.toStringAsFixed(1)}', style: F.fraunces(size: 52, weight: FontWeight.w700, color: accent, height: 1)),
           const SizedBox(width: 20),
           Expanded(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -1013,6 +1160,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ]);
       }),
     ]);
+  }
+
+  List<List<int>> _starDistribution(List<Map<String, dynamic>> revs) {
+    final counts = List<int>.filled(5, 0);
+    for (final r in revs) {
+      final stars = (r['stars'] as String? ?? '').length.clamp(0, 5);
+      if (stars > 0) counts[stars - 1]++;
+    }
+    final total = revs.length;
+    return [
+      for (var i = 4; i >= 0; i--)
+        [i + 1, total == 0 ? 0 : ((counts[i] * 100) / total).round()],
+    ];
   }
 
   Widget _reviewCard(Map r) {

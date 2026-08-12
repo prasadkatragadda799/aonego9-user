@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
-import '../data/app_data.dart';
 import 'common.dart';
 
 /// `.lcard` — a browse-grid listing card.
@@ -14,8 +13,8 @@ class ListingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = T.ac(item['cat'] as String?);
-    final idx = profiles.indexWhere((p) => p['id'] == item['id']);
-    final gradIndex = idx >= 0 ? idx : 0;
+    final id = item['id'] as String? ?? '';
+    final gradIndex = id.isEmpty ? 0 : id.hashCode.abs() % 6;
     final tags = (item['tags'] as List?) ?? const [];
 
     return HoverFx(

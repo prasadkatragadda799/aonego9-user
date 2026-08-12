@@ -117,7 +117,7 @@ class BrowseScreen extends StatelessWidget {
   }
 
   Widget _listBar(BuildContext context, AppState app, Color accent, Map cat, int count) {
-    final fs = filters[app.activeCat] ?? ['All'];
+    final fs = app.filtersFor(app.activeCat);
     return Padding(
       padding: EdgeInsets.fromLTRB(isNarrow(context) ? 16 : 20, 16, isNarrow(context) ? 16 : 20, 12),
       child: Wrap(

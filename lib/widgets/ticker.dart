@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
-import '../data/app_data.dart';
 import '../state/app_state.dart';
 
 /// `.ticker` — accent band with a red LIVE pill and an infinitely
@@ -43,9 +42,12 @@ class _TickerState extends State<Ticker> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final apiEvents = context.watch<AppState>().tickerEvents;
-    final liveItems = apiEvents.isNotEmpty
-        ? apiEvents.map((e) => '${e['on_poster'] == true ? '🔴' : '📅'} ${e['title']} · ${e['city']} · ${e['date']}').toList()
-        : tickerItems;
+    if (apiEvents.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final liveItems = apiEvents
+        .map((e) => '${e['on_poster'] == true ? '🔴' : '📅'} ${e['title']} · ${e['city']} · ${e['date']}')
+        .toList();
     final items = [...liveItems, ...liveItems];
     return Container(
       height: 33,

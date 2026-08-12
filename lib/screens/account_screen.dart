@@ -15,11 +15,14 @@ class AccountScreen extends StatefulWidget {
 class _AccountScreenState extends State<AccountScreen> {
   final _repo = UserRepository();
   List<Map<String, dynamic>>? _bookings; // null = loading, [] = none/failed
+  Map<String, dynamic>? _subscription; // null = none/loading — see _subLoaded
+  bool _subLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadSubscription();
   }
 
   Future<void> _load() async {
@@ -28,6 +31,15 @@ class _AccountScreenState extends State<AccountScreen> {
       if (mounted) setState(() => _bookings = b);
     } catch (_) {
       if (mounted) setState(() => _bookings = []);
+    }
+  }
+
+  Future<void> _loadSubscription() async {
+    try {
+      final s = await _repo.currentSubscription();
+      if (mounted) setState(() { _subscription = s; _subLoaded = true; });
+    } catch (_) {
+      if (mounted) setState(() => _subLoaded = true);
     }
   }
 
@@ -64,6 +76,27 @@ class _AccountScreenState extends State<AccountScreen> {
                       _row('Phone', user['phone']?.toString() ?? '—'),
                       _row('City', user['city']?.toString() ?? '—'),
                     ]),
+                  ),
+                  HoverFx(
+                    onTap: () => context.read<AppState>().setView('subscription'),
+                    builder: (h) => Blk(
+                      child: Row(children: [
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                            const BlkHeader('Subscription'),
+                            Text(
+                              !_subLoaded
+                                  ? 'Loading…'
+                                  : (_subscription != null ? '${_subscription!['plan_name']} plan · ${_subscription!['status']}' : 'No active subscription'),
+                              style: F.syne(size: 13, weight: FontWeight.w600, color: T.text),
+                            ),
+                            const SizedBox(height: 4),
+                            Text('Manage Subscription', style: F.syne(size: 12, weight: FontWeight.w600, color: T.gold)),
+                          ]),
+                        ),
+                        Icon(Icons.chevron_right, color: h ? T.text : T.mut),
+                      ]),
+                    ),
                   ),
                   Blk(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

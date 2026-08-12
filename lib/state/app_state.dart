@@ -47,7 +47,6 @@ class AppState extends ChangeNotifier {
   static const List<String> cities = ['Mumbai', 'Delhi NCR', 'Bangalore', 'All India'];
   ToastMsg? toast;
   String vendorName = 'Vendor';
-  final List<Map<String, dynamic>> vendorProfiles = [];
 
   /// Inquiries the user has posted — kept so they are trackable end-to-end.
   final List<Inquiry> inquiries = [];
@@ -132,7 +131,17 @@ class AppState extends ChangeNotifier {
   /// list is a genuine "nothing here yet" — never backfilled with fake data.
   List<Map<String, dynamic>>? _apiListings;
   List<Map<String, dynamic>>? _apiTickerEvents;
+  Map<String, List<String>> _apiFilters = {};
   bool listingsLoading = false;
+
+  static const _defaultFilters = <String, List<String>>{
+    'venue': ['All', 'Indoor', 'Outdoor', 'Rooftop', 'Heritage'],
+    'photo': ['All', 'Fashion', 'Wedding', 'Commercial', 'Portrait'],
+    'video': ['All', 'Brand Films', 'Wedding', 'Social Media', 'Documentary'],
+    'modelF': ['All', 'Fashion', 'Ethnic', 'Ramp', 'Film', 'Commercial', 'Fitness'],
+    'modelM': ['All', 'Fashion', 'Ethnic', 'Ramp', 'Film', 'Commercial', 'Fitness'],
+    'events': ['All', 'Fashion Shows', 'Corporate', 'Wedding Events', 'Concerts'],
+  };
 
   /// Real per-category listing counts, filled in as each category is
   /// visited this session. Never guessed/faked — a category the user
@@ -142,6 +151,16 @@ class AppState extends ChangeNotifier {
 
   List<Map<String, dynamic>> get apiListings => _apiListings ?? [];
   List<Map<String, dynamic>> get tickerEvents => _apiTickerEvents ?? [];
+  List<String> filtersFor(String catId) => _apiFilters[catId] ?? _defaultFilters[catId] ?? const ['All'];
+
+  static String _catIdFromSlug(String slug) => switch (slug) {
+        'venues' => 'venue',
+        'photography' => 'photo',
+        'videography' => 'video',
+        'models' => 'modelF',
+        'event-services' => 'events',
+        _ => slug,
+      };
 
   /// Vendors self-report a free-text category at registration (e.g.
   /// "Photography"), matched case-insensitively as a substring by the
@@ -168,6 +187,7 @@ class AppState extends ChangeNotifier {
       final results = await _repo.listings(
         category: _searchTermFor(activeCat),
         city: location == 'All India' ? null : location,
+        filter: filter == 'All' ? null : filter,
       );
       _apiListings = results.map(_normaliseVendor).toList();
       _categoryCounts[activeCat] = _apiListings!.length;
@@ -183,6 +203,25 @@ class AppState extends ChangeNotifier {
   Future<void> fetchTickerEvents() async {
     try {
       _apiTickerEvents = await _repo.tickerEvents();
+      notifyListeners();
+    } catch (_) {
+      _apiTickerEvents = [];
+      notifyListeners();
+    }
+  }
+
+  /// Load filter chips for each browse category from the backend.
+  Future<void> fetchCategories() async {
+    try {
+      final cats = await _repo.categories();
+      for (final c in cats) {
+        final catId = _catIdFromSlug(c['slug'] as String? ?? '');
+        final filters = (c['filters'] as List?)?.cast<String>() ?? const ['All'];
+        _apiFilters[catId] = filters;
+        if (catId == 'modelF') _apiFilters['modelM'] = filters;
+        final count = (c['count'] as num?)?.toInt();
+        if (count != null) _categoryCounts[catId] = count;
+      }
       notifyListeners();
     } catch (_) {}
   }
@@ -214,6 +253,7 @@ class AppState extends ChangeNotifier {
       'tags': <String>[],
       'badge': v['plan'] ?? 'Starter',
       'tagline': v['bio'] as String? ?? '',
+      'overview': v['bio'] as String? ?? '',
       'stats': [
         {'n': '$bookings', 'l': 'Bookings'},
         {'n': rating.toStringAsFixed(1), 'l': 'Rating'},
@@ -258,23 +298,13 @@ class AppState extends ChangeNotifier {
   }
 
   /// ── Reach / share analytics ───────────────────────────────────
-  /// Live increments per profile id. Seeded with a deterministic base so
-  /// every profile shows a believable reach; opens and shares add on top.
-  /// (A real backend would persist these cross-device — these are the
-  /// counters the profile + vendor console read.)
+  /// Session-only counters — no seeded fake bases.
   final Map<String, int> _views = {};
   final Map<String, int> _shares = {};
 
-  int _seed(String id, int span) => id.isEmpty ? 0 : (id.hashCode.abs() % span);
-
-  /// Total views a profile has had (seeded base + live opens).
-  int profileViews(String id) => 820 + _seed(id, 1400) + (_views[id] ?? 0);
-
-  /// Total times a profile link was shared (seeded base + live shares).
-  int profileShares(String id) => 24 + _seed(id, 70) + (_shares[id] ?? 0);
-
-  /// Overall reach — views plus an amplification per share.
-  int profileReach(String id) => profileViews(id) + profileShares(id) * 9;
+  int profileViews(String id) => _views[id] ?? 0;
+  int profileShares(String id) => _shares[id] ?? 0;
+  int profileReach(String id) => profileViews(id) + profileShares(id) * 3;
 
   /// The real, copy-pasteable deep link for a profile. Opening it routes
   /// straight to this profile via [_initFromUrl] (?go=profile/<id>).
@@ -297,6 +327,7 @@ class AppState extends ChangeNotifier {
     // Kick off API fetches immediately on startup
     fetchListings();
     fetchTickerEvents();
+    fetchCategories();
     restoreSession();
   }
 
@@ -317,14 +348,9 @@ class AppState extends ChangeNotifier {
         if (id.isNotEmpty) _openSharedProfile(id);
         break;
       case 'vendor-auth':
-        view = 'vendor-auth';
-        break;
       case 'vendor-dash':
-        view = 'vendor-dash';
-        vendorName = 'Rohan Studio';
-        break;
       case 'vendor-edit':
-        view = 'vendor-edit';
+        view = 'vendor-auth';
         break;
     }
   }
@@ -380,15 +406,22 @@ class AppState extends ChangeNotifier {
     showToast('Inquiry sent to $vendorName', 'Tracked as $ref · response in 2–4 hrs', urgent ? '🚨' : '✅');
   }
 
-  /// Pays the advance/deposit that confirms an inquiry and pushes it up the
-  /// vendor's queue. The deposit is adjusted against the final bill.
-  void payAdvance(String ref) {
-    final i = inquiries.indexWhere((q) => q.ref == ref);
-    if (i == -1) return;
-    inquiries[i].advancePaid = true;
-    inquiries[i].status = 'Advance paid';
-    notifyListeners();
-    showToast('Advance paid', 'Slot reserved with ${inquiries[i].vendorName} · adjusted against final bill', '💳');
+  /// Pays the advance/deposit via the backend when the user is signed in.
+  Future<bool> payAdvanceApi(String bookingId, String inquiryRef) async {
+    if (!isLoggedIn) return false;
+    try {
+      await _repo.payAdvance(bookingId, inquiryRef);
+      final i = inquiries.indexWhere((q) => q.ref == inquiryRef);
+      if (i != -1) {
+        inquiries[i].advancePaid = true;
+        inquiries[i].status = 'Advance paid';
+      }
+      notifyListeners();
+      showToast('Advance paid', 'Slot reserved · adjusted against final bill', '💳');
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   void openProfile(Map<String, dynamic> item) {
@@ -408,8 +441,11 @@ class AppState extends ChangeNotifier {
   }
 
   void setFilter(String f) {
+    if (filter == f) return;
     filter = f;
+    _apiListings = null;
     notifyListeners();
+    fetchListings();
   }
 
   void setView(String v) {
@@ -421,28 +457,5 @@ class AppState extends ChangeNotifier {
     view = 'browse';
     selectedProfile = null;
     notifyListeners();
-  }
-
-  void vendorLogin() {
-    vendorName = 'Rohan Studio';
-    view = 'vendor-dash';
-    notifyListeners();
-  }
-
-  void publishProfile(Map<String, dynamic> np) {
-    vendorProfiles.add({
-      ...np,
-      'rating': 4.5,
-      'reviewCount': 0,
-      'verified': false,
-      'isNew': true,
-      'tags': <String>[],
-      'tagline': 'Newly published profile',
-      'loc': 'India',
-      'badge': 'New Profile',
-    });
-    view = 'vendor-dash';
-    notifyListeners();
-    showToast('Profile Published!', 'Your profile is now live on AOneGo9', '🎉');
   }
 }
