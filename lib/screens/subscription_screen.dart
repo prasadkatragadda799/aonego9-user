@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -7,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../data/api_client.dart';
+import '../data/upload_service.dart';
 import '../data/user_repository.dart';
 import '../state/app_state.dart';
 import '../theme/tokens.dart';
@@ -310,7 +310,6 @@ class _PaymentDialog extends StatefulWidget {
 
 class _PaymentDialogState extends State<_PaymentDialog> {
   Uint8List? _imageBytes;
-  String? _receiptDataUri;
   bool _submitting = false;
 
   String get _upiUri {
@@ -326,15 +325,7 @@ class _PaymentDialogState extends State<_PaymentDialog> {
       final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
       if (picked == null) return;
       final bytes = await picked.readAsBytes();
-      String mime = 'image/jpeg';
-      final lower = picked.path.toLowerCase();
-      if (lower.endsWith('.png')) mime = 'image/png';
-      else if (lower.endsWith('.webp')) mime = 'image/webp';
-      final b64 = base64Encode(bytes);
-      setState(() {
-        _imageBytes = bytes;
-        _receiptDataUri = 'data:$mime;base64,$b64';
-      });
+      setState(() => _imageBytes = bytes);
     } catch (_) {
       if (mounted) {
         context.read<AppState>().showToast('Could not pick image', 'Please try again', '⚠️');
@@ -396,19 +387,19 @@ class _PaymentDialogState extends State<_PaymentDialog> {
               SizedBox(
                 width: double.infinity,
                 child: HoverFx(
-                  onTap: (_receiptDataUri == null || _submitting) ? null : _handleSubmit,
+                  onTap: (_imageBytes == null || _submitting) ? null : _handleSubmit,
                   builder: (h) => Container(
                     alignment: Alignment.center,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
-                      color: (_receiptDataUri == null || _submitting) ? T.surf : (h ? T.goldLight : T.gold),
+                      color: (_imageBytes == null || _submitting) ? T.surf : (h ? T.goldLight : T.gold),
                       borderRadius: BorderRadius.circular(8),
-                      border: (_receiptDataUri == null || _submitting) ? Border.all(color: T.bdr) : null,
+                      border: (_imageBytes == null || _submitting) ? Border.all(color: T.bdr) : null,
                     ),
                     child: _submitting
                         ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
                         : Text('Submit for review',
-                            style: F.syne(size: 13, weight: FontWeight.w700, color: (_receiptDataUri == null) ? T.dim : T.bg)),
+                            style: F.syne(size: 13, weight: FontWeight.w700, color: (_imageBytes == null) ? T.dim : T.bg)),
                   ),
                 ),
               ),
@@ -427,9 +418,21 @@ class _PaymentDialogState extends State<_PaymentDialog> {
   }
 
   Future<void> _handleSubmit() async {
-    if (_receiptDataUri == null) return;
+    if (_imageBytes == null || _submitting) return;
     setState(() => _submitting = true);
-    await widget.onSubmit(_receiptDataUri!);
+    try {
+      final url = await UploadService.uploadImage(
+        bytes: _imageBytes!,
+        filename: 'receipt.jpg',
+        folder: 'receipts',
+      );
+      await widget.onSubmit(url);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        context.read<AppState>().showToast('Upload failed', 'Please try again', '⚠️');
+      }
+    }
   }
 }
 

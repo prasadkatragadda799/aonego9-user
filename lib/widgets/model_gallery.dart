@@ -6,6 +6,31 @@ import 'common.dart';
 Map<String, dynamic> _typeInfo(String t) =>
     portTypes[t] ?? {'label': t, 'color': T.gold.value, 'icon': '📸'};
 
+Widget _portfolioImage(Map<String, dynamic> item, {double emojiSize = 44}) {
+  final url = (item['imageUrl'] as String?) ?? (item['image_url'] as String?) ?? '';
+  if (url.isNotEmpty) {
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (_, __, ___) => Container(
+        decoration: BoxDecoration(gradient: T.gr((item['bg'] as int?) ?? 0)),
+        alignment: Alignment.center,
+        child: Text(item['emoji'] ?? '', style: TextStyle(fontSize: emojiSize)),
+      ),
+    );
+  }
+  return Container(
+    decoration: BoxDecoration(gradient: T.gr((item['bg'] as int?) ?? 0)),
+    alignment: Alignment.center,
+    child: Opacity(
+      opacity: .55,
+      child: Text(item['emoji'] ?? '', style: TextStyle(fontSize: emojiSize)),
+    ),
+  );
+}
+
 /// `ModelGallery` — IG-style portfolio: story filters + 3-col grid + lightbox.
 class ModelGallery extends StatefulWidget {
   final List<Map<String, dynamic>> items;
@@ -170,15 +195,7 @@ class _PortCell extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Container(
-                    decoration: BoxDecoration(gradient: T.gr((item['bg'] as int?) ?? 0)),
-                    alignment: Alignment.center,
-                    child: AnimatedScale(
-                      duration: const Duration(milliseconds: 250),
-                      scale: h ? 1.08 : 1,
-                      child: Opacity(opacity: h ? .7 : .55, child: Text(item['emoji'] ?? '', style: const TextStyle(fontSize: 44))),
-                    ),
-                  ),
+                  _portfolioImage(item, emojiSize: 44),
                   if (h)
                     Container(
                       color: const Color(0x7309090B),
@@ -288,11 +305,7 @@ class _LightboxState extends State<_Lightbox> {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      Container(
-                        decoration: BoxDecoration(gradient: T.gr(item['bg'] as int? ?? _i)),
-                        alignment: Alignment.center,
-                        child: Opacity(opacity: .4, child: Text(item['emoji'] ?? '', style: const TextStyle(fontSize: 120))),
-                      ),
+                      _portfolioImage(item, emojiSize: 120),
                       Positioned(left: 16, child: _Arrow(label: '‹', onTap: _prev)),
                       Positioned(right: 16, child: _Arrow(label: '›', onTap: _next)),
                     ],

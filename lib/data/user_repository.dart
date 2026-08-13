@@ -107,6 +107,7 @@ class UserRepository {
         'headline': headline,
         'desc': desc,
         'emoji': emoji,
+        'imageUrl': j['image_url'] as String? ?? '',
       };
     }).toList();
   }
@@ -239,10 +240,10 @@ class UserRepository {
   }
 
   // POST /api/v1/subscriptions/request
-  Future<Map<String, dynamic>> requestSubscription(String planId, String receiptImageBase64) async {
+  Future<Map<String, dynamic>> requestSubscription(String planId, String receiptImageUrl) async {
     final data = await ApiClient.post('/subscriptions/request', {
       'plan_id': planId,
-      'receipt_image': receiptImageBase64,
+      'receipt_image': receiptImageUrl,
     });
     return data as Map<String, dynamic>;
   }
