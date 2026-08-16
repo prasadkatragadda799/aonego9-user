@@ -56,7 +56,7 @@ class VendorProfileUtils {
   }
 
   static bool _preserveWhenEmpty(String key) =>
-      key == 'stats' || key == 'tags' || key == 'services' || key == 'amenities';
+      key == 'stats' || key == 'tags' || key == 'services' || key == 'amenities' || key == 'sceneData';
 
   static List<Map<String, String>> buildDefaultStats(Map<String, dynamic> p) {
     final cat = p['cat'] as String? ?? '';

@@ -13,13 +13,32 @@ class SceneMatrix extends StatelessWidget {
     // Build groups: an item with 'group' starts a new group.
     final groups = <Map<String, dynamic>>[];
     Map<String, dynamic>? current;
-    for (final item in sceneData) {
+    for (final raw in sceneData) {
+      final item = Map<String, dynamic>.from(raw);
       if (item.containsKey('group')) {
         current = {'title': item['group'], 'items': <Map<String, dynamic>>[]};
         groups.add(current);
       } else if (current != null) {
-        (current['items'] as List).add(item);
+        (current['items'] as List<Map<String, dynamic>>).add(item);
       }
+    }
+
+    // Vendor console saves flat scene rows (no group headers). Show them anyway.
+    if (groups.isEmpty && sceneData.isNotEmpty) {
+      groups.add({
+        'title': 'Scene Availability',
+        'items': sceneData
+            .where((raw) => !Map<String, dynamic>.from(raw).containsKey('group'))
+            .map((raw) => Map<String, dynamic>.from(raw))
+            .toList(),
+      });
+    }
+
+    if (groups.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Text('No scene availability listed yet.', style: F.syne(size: 13, color: T.mut)),
+      );
     }
 
     final twoCol = !isNarrow(context);

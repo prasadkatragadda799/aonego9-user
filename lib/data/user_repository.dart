@@ -140,6 +140,31 @@ class UserRepository {
     ];
   }
 
+  static Map<String, dynamic> _normalizeSceneItem(Map<String, dynamic> item) {
+    if (item.containsKey('group')) return item;
+    final status = (item['status'] as String?)?.trim().isNotEmpty == true ? item['status'] as String : 'avail';
+    final icon = switch (status) {
+      'verified' => '⚠',
+      'restricted' => '🔒',
+      'no' => '✗',
+      _ => (item['icon'] as String?)?.trim().isNotEmpty == true ? item['icon'] as String : '✓',
+    };
+    return {
+      ...item,
+      'status': status,
+      'icon': icon,
+      'label': item['label'] ?? '',
+      'desc': item['desc'] ?? item['description'] ?? '',
+    };
+  }
+
+  static List<Map<String, dynamic>> _normalizeSceneData(List<dynamic> raw) {
+    return raw
+        .whereType<Map>()
+        .map((m) => _normalizeSceneItem(m.cast<String, dynamic>()))
+        .toList();
+  }
+
   static Map<String, dynamic> _mapProfileDetails(Map<String, dynamic> data) {
     final cc = (data['comp_card'] as Map?)?.cast<String, dynamic>() ?? {};
     return {
@@ -163,7 +188,7 @@ class UserRepository {
       'services': data['services'] ?? [],
       'amenities': data['amenities'] ?? [],
       'avail': data['availability'] ?? [],
-      'sceneData': data['scene_data'] ?? [],
+      'sceneData': _normalizeSceneData((data['scene_data'] as List?) ?? []),
       'spaces': data['spaces'] ?? [],
       'equipment': data['equipment'] ?? [],
       'reels': data['reels'] ?? [],
