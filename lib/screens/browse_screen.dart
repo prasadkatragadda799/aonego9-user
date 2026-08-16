@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+// Prefixed: this file also uses the app's own `Ticker` marquee widget.
+import 'package:flutter/scheduler.dart' as sched;
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
 import '../data/app_data.dart';
@@ -32,11 +36,22 @@ class BrowseScreen extends StatelessWidget {
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1280),
+                child: _hero(context, accent, catInfo, hero),
+              ),
+            ),
+          ),
+          // The category rail is now the ONLY category switcher — the nav used
+          // to repeat the same six links right above it. Pinned, because
+          // dropping the nav copy would otherwise leave no way to change
+          // category once you scroll past the hero.
+          SliverPersistentHeader(pinned: true, delegate: _RailDelegate(app, accent, w)),
+          SliverToBoxAdapter(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1280),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _hero(context, accent, catInfo, hero),
-                    _catRail(app, accent),
                     _listBar(context, app, accent, catInfo, items.length),
                     _grid(context, app, accent, items, w),
                     const SizedBox(height: 72),
@@ -92,29 +107,6 @@ class BrowseScreen extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _catRail(AppState app, Color accent) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 24),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Row(
-          children: [
-            for (final c in cats) ...[
-              _CTab(
-                cat: c,
-                active: app.activeCat == c['id'],
-                count: app.knownCategoryCount(c['id'] as String),
-                onTap: () => app.switchCat(c['id'] as String),
-              ),
-              const SizedBox(width: 8),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -235,12 +227,9 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     final narrow = isNarrow(context);
-    // Six category links plus both button clusters need ~1100px. Below that
-    // they were clipping mid-word ("Event Se…"), so drop them and let the
-    // category rail directly underneath carry navigation — it lists the exact
-    // same six categories with live counts, so nothing becomes unreachable.
-    final showNavLinks = screenW(context) > 1100;
-    // Vendor Portal survives a bit further down before it has to go.
+    // Category links used to live here too, duplicating the rail immediately
+    // below. They are gone: the pinned rail is the single category switcher,
+    // and it carries live per-category counts the nav links never had.
     final showVendorBtn = screenW(context) > 880;
     return Container(
       decoration: const BoxDecoration(
@@ -270,22 +259,7 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
                 // Location picker — the whole marketplace filters to this city.
                 _LocationChip(app: app, compact: narrow),
                 const SizedBox(width: 8),
-                // Links
-                if (showNavLinks)
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          for (final c in cats)
-                            _NavLink(cat: c, active: app.activeCat == c['id'], onTap: () => app.switchCat(c['id'] as String)),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  const Spacer(),
+                const Spacer(),
                 const SizedBox(width: 8),
                 // Right
                 if (showVendorBtn) ...[
@@ -319,41 +293,280 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
       old.app.isLoggedIn != app.isLoggedIn;
 }
 
-class _NavLink extends StatelessWidget {
-  final Map cat;
-  final bool active;
-  final VoidCallback onTap;
-  const _NavLink({required this.cat, required this.active, required this.onTap});
+/// Pinned category rail — the app's primary category switcher.
+///
+/// Replaces the six duplicate links that used to sit in the nav bar directly
+/// above it. Pinning keeps categories reachable after the hero scrolls away,
+/// which is what the nav copy was doing.
+class _RailDelegate extends SliverPersistentHeaderDelegate {
+  final AppState app;
+  final Color accent;
+  final double width;
+  _RailDelegate(this.app, this.accent, this.width);
+
   @override
-  Widget build(BuildContext context) {
-    final accent = T.ac(cat['id']);
-    // Label only — the emoji + count live on the category rail below, and
-    // carrying them here too pushed all six links past the available width.
-    return HoverFx(
-      onTap: onTap,
-      builder: (h) => AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: active ? accent : Colors.transparent,
-              width: 1.5,
-            ),
-          ),
-        ),
-        child: Text(
-          cat['name'],
-          maxLines: 1,
-          style: F.syne(
-            size: 12,
-            weight: active ? FontWeight.w700 : FontWeight.w600,
-            color: active ? accent : (h ? T.text : T.mut),
-          ),
+  double get minExtent => 86;
+  @override
+  double get maxExtent => 86;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xF709090B),
+        border: Border(bottom: BorderSide(color: T.bdr)),
+      ),
+      alignment: Alignment.center,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1280),
+          child: _CategoryRail(app: app),
         ),
       ),
     );
   }
+
+  @override
+  bool shouldRebuild(covariant _RailDelegate old) =>
+      old.app.activeCat != app.activeCat || old.accent != accent || old.width != width;
+}
+
+/// The scrolling row of category tabs.
+///
+/// Stateful for two reasons, both about keeping the *other* categories present
+/// in the user's mind once one is selected:
+///   1. edge fades signal that the row continues past the viewport, which is
+///      the only cue on a phone that more categories exist off-screen;
+///   2. selecting a category scrolls that tab into view, so switching from the
+///      footer or a deep link never leaves the rail parked somewhere unrelated.
+class _CategoryRail extends StatefulWidget {
+  final AppState app;
+  const _CategoryRail({required this.app});
+  @override
+  State<_CategoryRail> createState() => _CategoryRailState();
+}
+
+class _CategoryRailState extends State<_CategoryRail> with SingleTickerProviderStateMixin {
+  final _sc = ScrollController();
+  final _keys = {for (final c in cats) c['id'] as String: GlobalKey()};
+  late String _lastCat = widget.app.activeCat;
+  bool _more = false;
+  bool _before = false;
+
+  // ── Slow auto-scroll ──────────────────────────────────────────────
+  // The rail drifts gently end-to-end so every category is seen without the
+  // user having to discover that it scrolls. It ping-pongs rather than looping,
+  // because a seamless loop would mean duplicating the tabs — and duplicate
+  // category tabs are ambiguous to tap and break the per-tab keys.
+  // Deliberately slow: this is ambient "there is more over here" motion, not a
+  // marquee. The speed carries the calm; the end pause is kept short so the
+  // rail reads as continuously drifting rather than stopping and starting.
+  static const double _driftPxPerSecond = 7;
+  static const double _edgeHoldSeconds = 0.5;
+
+  sched.Ticker? _ticker;
+  Duration _lastTick = Duration.zero;
+  double _hold = _edgeHoldSeconds; // settle before the first drift
+  int _dir = 1;
+  bool _paused = false;
+  bool _reduceMotion = false;
+  Timer? _resumeTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _sc.addListener(_syncEdges);
+    // Deliberately no _reveal() on mount. The default category is the 4th of
+    // six, so centring it on first paint would scroll Event Venues and
+    // Photography off-screen before the user has seen the rail at all. Landing
+    // at the start shows the list in order; the edge fade advertises the rest.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncEdges());
+    _ticker = createTicker(_onTick)..start();
+  }
+
+  @override
+  void dispose() {
+    _ticker?.dispose();
+    _resumeTimer?.cancel();
+    _sc.dispose();
+    super.dispose();
+  }
+
+  void _onTick(Duration elapsed) {
+    var dt = (elapsed - _lastTick).inMicroseconds / 1e6;
+    _lastTick = elapsed;
+    if (dt <= 0) return;
+    // Clamp long frames rather than discarding them. A backgrounded tab throttles
+    // rAF and produces huge deltas; clamping keeps the rail from lurching, while
+    // discarding (the obvious alternative) stalls the drift completely on any
+    // host that renders below 4fps.
+    if (dt > 1 / 30) dt = 1 / 30;
+    if (_paused || _reduceMotion || !_sc.hasClients) return;
+
+    final max = _sc.position.maxScrollExtent;
+    if (max <= 0) return; // everything already fits — nothing to reveal
+    if (_hold > 0) {
+      _hold -= dt;
+      return;
+    }
+
+    var next = _sc.offset + _dir * _driftPxPerSecond * dt;
+    if (next >= max) {
+      next = max;
+      _dir = -1;
+      _hold = _edgeHoldSeconds;
+    } else if (next <= 0) {
+      next = 0;
+      _dir = 1;
+      _hold = _edgeHoldSeconds;
+    }
+    _sc.jumpTo(next);
+  }
+
+  /// Stop drifting while the user is doing something, and for a beat after.
+  void _pauseDrift() {
+    _resumeTimer?.cancel();
+    _paused = true;
+  }
+
+  void _resumeDrift([Duration after = const Duration(seconds: 3)]) {
+    _resumeTimer?.cancel();
+    _resumeTimer = Timer(after, () {
+      if (mounted) _paused = false;
+    });
+  }
+
+  void _syncEdges() {
+    if (!_sc.hasClients) return;
+    final more = _sc.offset < _sc.position.maxScrollExtent - 1;
+    final before = _sc.offset > 1;
+    if (more != _more || before != _before) {
+      setState(() {
+        _more = more;
+        _before = before;
+      });
+    }
+  }
+
+  /// Bring the selected tab fully into view, centred where possible.
+  ///
+  /// Driven off the rail's own controller rather than
+  /// `Scrollable.ensureVisible`, which walks every ancestor scrollable and
+  /// would scroll the page vertically as a side effect of a category tap.
+  void _reveal() {
+    if (!_sc.hasClients) return;
+    final ctx = _keys[widget.app.activeCat]?.currentContext;
+    final rail = context.findRenderObject() as RenderBox?;
+    final tab = ctx?.findRenderObject() as RenderBox?;
+    if (rail == null || tab == null || !rail.hasSize || !tab.hasSize) return;
+
+    final dx = tab.localToGlobal(Offset.zero, ancestor: rail).dx;
+    final target = _sc.offset + dx - (rail.size.width - tab.size.width) / 2;
+    _sc.animateTo(
+      target.clamp(0.0, _sc.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // `app` is a single ChangeNotifier instance, so didUpdateWidget can't see a
+    // category change — track it here instead.
+    if (_lastCat != widget.app.activeCat) {
+      _lastCat = widget.app.activeCat;
+      _pauseDrift();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _reveal();
+        _syncEdges();
+      });
+      // Long enough that the recentre animation lands and the user can read
+      // their choice before the rail starts moving again.
+      _resumeDrift(const Duration(seconds: 5));
+    }
+
+    // Users who asked their OS to reduce motion get a static rail. Held in its
+    // own flag rather than forcing `_paused`, so the drift comes back if the
+    // preference is switched off mid-session instead of latching off forever.
+    _reduceMotion = MediaQuery.of(context).disableAnimations;
+
+    final pad = isNarrow(context) ? 16.0 : 20.0;
+    return MouseRegion(
+      // Drifting out from under a cursor that is about to click is the fastest
+      // way to make this feel broken, so hovering halts it immediately.
+      onEnter: (_) => _pauseDrift(),
+      onExit: (_) => _resumeDrift(const Duration(milliseconds: 1200)),
+      child: Listener(
+        // Touch + manual scroll: hold still while the finger is down, then wait
+        // before taking over again.
+        onPointerDown: (_) => _pauseDrift(),
+        onPointerUp: (_) => _resumeDrift(),
+        onPointerCancel: (_) => _resumeDrift(),
+        // Wheel/trackpad: pause AND schedule the resume in one go — a signal
+        // has no matching "up" event to resume from.
+        onPointerSignal: (_) {
+          _pauseDrift();
+          _resumeDrift();
+        },
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              controller: _sc,
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: pad),
+              child: Row(
+                children: [
+                  for (final c in cats) ...[
+                    _CTab(
+                      key: _keys[c['id'] as String],
+                      cat: c,
+                      active: widget.app.activeCat == c['id'],
+                      count: widget.app.knownCategoryCount(c['id'] as String),
+                      onTap: () => widget.app.switchCat(c['id'] as String),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                ],
+              ),
+            ),
+            // Fades that say "there is more this way".
+            _EdgeFade(visible: _before, left: true),
+            _EdgeFade(visible: _more, left: false),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EdgeFade extends StatelessWidget {
+  final bool visible;
+  final bool left;
+  const _EdgeFade({required this.visible, required this.left});
+
+  @override
+  Widget build(BuildContext context) => Positioned(
+        left: left ? 0 : null,
+        right: left ? null : 0,
+        top: 0,
+        bottom: 0,
+        child: IgnorePointer(
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: visible ? 1 : 0,
+            child: Container(
+              width: 46,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: left ? Alignment.centerLeft : Alignment.centerRight,
+                  end: left ? Alignment.centerRight : Alignment.centerLeft,
+                  colors: const [Color(0xF709090B), Color(0x0009090B)],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class _GhostBtn extends StatelessWidget {
@@ -396,33 +609,83 @@ class _CTab extends StatelessWidget {
   final bool active;
   final int? count; // null = not fetched yet (this category hasn't been opened this session)
   final VoidCallback onTap;
-  const _CTab({required this.cat, required this.active, required this.count, required this.onTap});
+  const _CTab({super.key, required this.cat, required this.active, required this.count, required this.onTap});
   @override
   Widget build(BuildContext context) {
     final accent = T.ac(cat['id']);
     final none = count == 0;
+
+    // Every tab wears its OWN category accent, not just the selected one.
+    // Previously the five unselected tabs collapsed into identical grey, so
+    // choosing a category made the alternatives disappear — the user stopped
+    // registering that other categories existed. Now the rail always reads as
+    // six distinct, colour-coded options, and "selected" is a difference of
+    // intensity rather than the difference between colour and no colour.
     return HoverFx(
       onTap: onTap,
-      builder: (h) => Opacity(
-        opacity: none ? .5 : 1,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-          decoration: BoxDecoration(
-            color: T.surf,
-            border: Border.all(color: active ? accent : (h ? T.bdhi : T.bdr)),
-            borderRadius: BorderRadius.circular(8),
+      builder: (h) => AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: active
+              ? accent.withValues(alpha: .16)
+              : (h ? accent.withValues(alpha: .10) : T.card),
+          border: Border.all(
+            // Even at rest an unselected tab keeps a readable tint of its own
+            // accent, so the row never flattens into grey.
+            color: active
+                ? accent
+                : accent.withValues(alpha: h ? .65 : .34),
+            width: active ? 1.6 : 1.2,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(width: 7, height: 7, decoration: BoxDecoration(color: active ? accent : (none ? T.bdr : T.grn), shape: BoxShape.circle)),
-              const SizedBox(width: 8),
-              Text('${cat['icon']} ${cat['name']}',
-                  style: F.syne(size: 12, weight: FontWeight.w700, color: active ? accent : T.mut)),
-              const SizedBox(width: 8),
-              Text(count == null ? '–' : '$count', style: F.mono(size: 10, color: none ? T.dim : accent)),
-            ],
-          ),
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: active
+              ? [BoxShadow(color: accent.withValues(alpha: .22), blurRadius: 18, offset: const Offset(0, 4))]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Availability dot: accent when selected, green when this category
+            // has listings, hollow when it is empty.
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: active ? accent : (none ? Colors.transparent : T.grn),
+                border: none && !active ? Border.all(color: T.bdhi, width: 1.2) : null,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text('${cat['icon']}', style: const TextStyle(fontSize: 15)),
+            const SizedBox(width: 7),
+            Text(
+              cat['name'],
+              style: F.syne(
+                size: 13.5,
+                weight: FontWeight.w700,
+                // Unselected labels sit at full body brightness (7.4:1), not
+                // the old muted grey — they have to stay readable to stay
+                // clickable.
+                color: active ? accent : (h ? T.cream : T.text),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Count as a badge rather than loose trailing digits.
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: active ? accent.withValues(alpha: .22) : accent.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Text(
+                count == null ? '–' : '$count',
+                style: F.mono(size: 10, color: none && !active ? T.dim : accent),
+              ),
+            ),
+          ],
         ),
       ),
     );
