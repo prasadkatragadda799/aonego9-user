@@ -79,8 +79,8 @@ class UserRepository {
       return {
         'name': j['title'] ?? '',
         'price': priceStr,
-        'span': ' / ${j['unit'] ?? ''}',
-        'feats': (j['description'] as String? ?? '').split('.').where((s) => s.trim().isNotEmpty).map((s) => s.trim()).toList(),
+        'span': (j['unit'] as String?)?.trim().isNotEmpty == true ? ' / ${j['unit']}' : '',
+        'feats': _packageFeatures(j),
         'pop': false,
         'id': j['id'],
         'bookingsCount': j['bookings_count'] ?? 0,
@@ -122,6 +122,22 @@ class UserRepository {
   Future<Map<String, dynamic>> vendorProfileDetails(String vendorId) async {
     final data = await ApiClient.get('/vendors/public/$vendorId/profile-details');
     return _mapProfileDetails(data as Map<String, dynamic>);
+  }
+
+  static List<String> _packageFeatures(Map<String, dynamic> j) {
+    final desc = (j['description'] as String?)?.trim() ?? '';
+    if (desc.isNotEmpty) {
+      final parts = desc.split('.').where((s) => s.trim().isNotEmpty).map((s) => s.trim()).toList();
+      if (parts.isNotEmpty) return parts;
+    }
+    final title = (j['title'] as String?)?.trim() ?? '';
+    final category = (j['category'] as String?)?.trim() ?? '';
+    final unit = (j['unit'] as String?)?.trim() ?? '';
+    return [
+      if (category.isNotEmpty) category,
+      if (unit.isNotEmpty) 'Priced per $unit',
+      if (title.isNotEmpty) title,
+    ];
   }
 
   static Map<String, dynamic> _mapProfileDetails(Map<String, dynamic> data) {

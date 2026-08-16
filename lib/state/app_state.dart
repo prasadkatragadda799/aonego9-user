@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import '../data/api_client.dart';
 import '../data/user_repository.dart';
+import '../data/vendor_profile_utils.dart';
 
 /// Toast payload — title (t), body (b), icon (i).
 class ToastMsg {
@@ -241,30 +242,34 @@ class AppState extends ChangeNotifier {
     final city = v['city'] as String? ?? '';
     final rating = (v['rating'] as num?)?.toDouble() ?? 0.0;
     final bookings = (v['total_bookings'] as num?)?.toInt() ?? 0;
+    final avatarUrl = (v['avatar_url'] as String?)?.trim() ?? '';
 
-    return {
+    final profile = <String, dynamic>{
       'id': v['id'] ?? '',
       'cat': cat,
       'name': name,
       'loc': city,
       'rating': rating,
       'reviewCount': bookings,
-      'verified': true,
-      'tags': <String>[],
+      'verified': v['kyc_verified'] as bool? ?? false,
+      'tags': (v['tags'] as List?)?.cast<String>() ?? <String>[],
       'badge': v['plan'] ?? 'Starter',
       'tagline': v['bio'] as String? ?? '',
       'overview': v['bio'] as String? ?? '',
+      'avatarUrl': avatarUrl,
+      'emoji': VendorProfileUtils.categoryEmoji(cat),
       'stats': [
         {'n': '$bookings', 'l': 'Bookings'},
         {'n': rating.toStringAsFixed(1), 'l': 'Rating'},
-        {'n': city, 'l': 'City'},
+        if (city.isNotEmpty) {'n': city, 'l': 'City'},
         {'n': v['plan'] ?? 'Starter', 'l': 'Plan'},
       ],
       'revList': <dynamic>[],
       'isNew': bookings == 0,
-      // keep raw backend fields for profile screen deep-dive
       '_raw': v,
     };
+    profile['stats'] = VendorProfileUtils.buildDefaultStats(profile);
+    return profile;
   }
 
   /// Submit inquiry to the backend, then record locally.

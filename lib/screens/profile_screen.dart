@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
+import '../data/app_data.dart';
 import '../data/user_repository.dart';
+import '../data/vendor_profile_utils.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
 import '../widgets/lead_form.dart';
@@ -65,7 +67,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final details = await _repo.vendorProfileDetails(vendorId);
       if (mounted) setState(() {
-        _mergedProfile = {..._mergedProfile, ...details};
+        _mergedProfile = VendorProfileUtils.mergeDetails(_mergedProfile, details);
+        _mergedProfile['stats'] = VendorProfileUtils.buildDefaultStats(_mergedProfile);
         _detailsLoaded = true;
       });
     } catch (_) {
@@ -80,6 +83,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final data = await _repo.vendorReviews(vendorId);
       if (!mounted) return;
       final items = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final total = (data['total'] as num?)?.toInt() ?? items.length;
+      final avg = (data['average_rating'] as num?)?.toDouble() ?? 0;
       setState(() {
         _apiReviews = items.map((r) {
           final stars = (r['stars'] as num?)?.toInt() ?? 0;
@@ -90,7 +95,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'text': r['text'] ?? '',
           };
         }).toList();
-        _apiReviewAvg = (data['average_rating'] as num?)?.toDouble() ?? 0;
+        _apiReviewAvg = avg;
+        _mergedProfile = {
+          ..._mergedProfile,
+          'reviewCount': total,
+          if (avg > 0) 'rating': avg,
+        };
+        _mergedProfile['stats'] = VendorProfileUtils.buildDefaultStats(_mergedProfile);
       });
     } catch (_) {
       if (mounted) setState(() { _apiReviews = []; _apiReviewAvg = 0; });
@@ -152,7 +163,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               slivers: [
                 SliverToBoxAdapter(child: _phero(app)),
                 SliverToBoxAdapter(child: _reachBar(app)),
-                if (p['stats'] != null) SliverToBoxAdapter(child: _stats()),
+                if ((p['stats'] as List?)?.isNotEmpty == true) SliverToBoxAdapter(child: _stats()),
                 SliverPersistentHeader(pinned: true, delegate: _TabsDelegate(_tabs, _tab, accent, (t) => setState(() => _tab = t))),
                 SliverToBoxAdapter(child: _layout(tablet)),
                 const SliverToBoxAdapter(child: SizedBox(height: 100)),
@@ -310,6 +321,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (((p['avatarUrl'] as String?)?.trim() ?? '').isNotEmpty) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(width: 72, height: 72, child: _profileAvatar(size: 72, emojiSize: 34)),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     Row(mainAxisSize: MainAxisSize.min, children: [
                       Container(width: 14, height: 1.5, color: accent),
                       const SizedBox(width: 8),
@@ -326,7 +344,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 16),
                     Wrap(spacing: 14, runSpacing: 6, children: [
                       Text('📍 ${p['loc']}', style: F.syne(size: 12, weight: FontWeight.w400, color: T.dim)),
-                      if (p['exp'] != null) Text('🎯 ${p['exp']}', style: F.syne(size: 12, weight: FontWeight.w400, color: T.dim)),
+                      if (VendorProfileUtils.hasText(p['exp'])) Text('🎯 ${VendorProfileUtils.displayValue(p['exp'])}', style: F.syne(size: 12, weight: FontWeight.w400, color: T.dim)),
                       if (p['verified'] == true) Text('✓ Verified', style: F.syne(size: 12, weight: FontWeight.w400, color: T.grn)),
                     ]),
                     const SizedBox(height: 14),
@@ -529,7 +547,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       case 'Availability':
         return _availability();
       case 'Packages':
-        return isEvent ? _eventPackages() : _packages();
+        return _packages();
       case 'Reviews':
         return _reviews();
     }
@@ -545,22 +563,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     final mF = cat == 'modelF';
     final meas = <List<String>>[
-      ['Height', '${p['height']}'],
-      ['Weight', '${p['weight']}'],
-      if (mF && p['bust'] != null) ['Bust', '${p['bust']}'],
-      if (!mF && p['chest'] != null) ['Chest', '${p['chest']}'],
-      if (p['waist'] != null) ['Waist', '${p['waist']}'],
-      if (mF && p['hip'] != null) ['Hip', '${p['hip']}'],
-      ['Shoe', '${p['shoe']}'],
-      ['Age', '${p['age']} yrs'],
+      if (VendorProfileUtils.hasText(p['height'])) ['Height', VendorProfileUtils.displayValue(p['height'])],
+      if (VendorProfileUtils.hasText(p['weight'])) ['Weight', VendorProfileUtils.displayValue(p['weight'])],
+      if (mF && VendorProfileUtils.hasText(p['bust'])) ['Bust', VendorProfileUtils.displayValue(p['bust'])],
+      if (!mF && VendorProfileUtils.hasText(p['chest'])) ['Chest', VendorProfileUtils.displayValue(p['chest'])],
+      if (VendorProfileUtils.hasText(p['waist'])) ['Waist', VendorProfileUtils.displayValue(p['waist'])],
+      if (mF && VendorProfileUtils.hasText(p['hip'])) ['Hip', VendorProfileUtils.displayValue(p['hip'])],
+      if (VendorProfileUtils.hasText(p['shoe'])) ['Shoe', VendorProfileUtils.displayValue(p['shoe'])],
+      if (p['age'] != null) ['Age', VendorProfileUtils.displayValue(p['age'], suffix: ' yrs')],
     ];
     final bio = <List<String>>[
-      ['Skin Tone', '${p['skin']}'],
-      ['Hair', '${p['hair']}'],
-      ['Eyes', '${p['eye']}'],
-      ['Languages', '${p['langs']}'],
-      ['Training', '${p['training']}'],
-      ['Experience', '${p['exp']}'],
+      if (VendorProfileUtils.hasText(p['skin'])) ['Skin Tone', VendorProfileUtils.displayValue(p['skin'])],
+      if (VendorProfileUtils.hasText(p['hair'])) ['Hair', VendorProfileUtils.displayValue(p['hair'])],
+      if (VendorProfileUtils.hasText(p['eye'])) ['Eyes', VendorProfileUtils.displayValue(p['eye'])],
+      if (VendorProfileUtils.hasText(p['langs'])) ['Languages', VendorProfileUtils.displayValue(p['langs'])],
+      if (VendorProfileUtils.hasText(p['training'])) ['Training', VendorProfileUtils.displayValue(p['training'])],
+      if (VendorProfileUtils.hasText(p['exp'])) ['Experience', VendorProfileUtils.displayValue(p['exp'])],
     ];
     final measCols = screenW(context) <= 768 ? 2 : 4;
     return Container(
@@ -580,15 +598,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               border: Border.all(color: T.gold.withOpacity(.25)),
               borderRadius: BorderRadius.circular(10),
             ),
-            alignment: Alignment.center,
-            child: Text(p['emoji'] ?? '', style: const TextStyle(fontSize: 34)),
+            clipBehavior: Clip.antiAlias,
+            child: _profileAvatar(size: 68, emojiSize: 34),
           ),
           Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             Text(p['name'] ?? '', style: F.fraunces(size: 22, weight: FontWeight.w700, color: T.cream)),
             const SizedBox(height: 3),
             Text(((p['tags'] as List?) ?? []).join(' · '), style: F.syne(size: 12, weight: FontWeight.w700, color: accent)),
             const SizedBox(height: 2),
-            Text('📍 ${p['loc']} · ${p['exp']} experience', style: F.syne(size: 12, weight: FontWeight.w400, color: T.dim)),
+            Text(
+              '📍 ${p['loc']}${VendorProfileUtils.hasText(p['exp']) ? ' · ${VendorProfileUtils.displayValue(p['exp'])} experience' : ''}',
+              style: F.syne(size: 12, weight: FontWeight.w400, color: T.dim),
+            ),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
@@ -598,6 +619,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ]),
         ]),
         const SizedBox(height: 22),
+        if (meas.isEmpty && bio.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text('No comp card details saved yet.', style: F.syne(size: 13, color: T.mut)),
+          ),
+        if (meas.isNotEmpty) ...[
         const BlkHeader('Physical Measurements'),
         LayoutBuilder(builder: (context, bc) {
           const gap = 9.0;
@@ -616,6 +643,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
           ]);
         }),
+        ],
+        if (bio.isNotEmpty) ...[
         const SizedBox(height: 18),
         const BlkHeader('Personal & Professional'),
         LayoutBuilder(builder: (context, bc) {
@@ -642,12 +671,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
           ]);
         }),
+        ],
       ]),
     );
   }
 
+  Widget _profileAvatar({required double size, double emojiSize = 80}) {
+    final url = (p['avatarUrl'] as String?)?.trim() ?? '';
+    if (url.isNotEmpty) {
+      return Image.network(
+        url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Center(
+          child: Text(p['emoji'] ?? '', style: TextStyle(fontSize: emojiSize)),
+        ),
+      );
+    }
+    return Center(child: Text(p['emoji'] ?? '', style: TextStyle(fontSize: emojiSize)));
+  }
+
   Widget _genPortfolio() {
-    final port = _apiPortfolio ?? (p['portfolio'] as List?)?.cast<Map>() ?? [];
+    final port = (_apiPortfolio ?? (p['portfolio'] as List?)?.cast<Map<String, dynamic>>() ?? []);
     if (_apiPortfolio == null) {
       return const Blk(child: Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
@@ -681,11 +727,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     decoration: BoxDecoration(border: Border.all(color: h ? T.gold : T.bdr), borderRadius: BorderRadius.circular(9)),
                     clipBehavior: Clip.antiAlias,
                     child: Stack(fit: StackFit.expand, children: [
-                      Container(
-                        decoration: BoxDecoration(gradient: T.gr((port[i]['bg'] as int?) ?? i)),
-                        alignment: Alignment.center,
-                        child: Opacity(opacity: .55, child: Text(port[i]['e'] ?? '', style: const TextStyle(fontSize: 40))),
-                      ),
+                      portfolioCoverImage(port[i], emojiSize: 40),
                       Positioned(
                         top: 9, left: 9,
                         child: Container(

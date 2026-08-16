@@ -42,15 +42,26 @@ class ListingCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Container(
-                    decoration: BoxDecoration(gradient: T.gr(gradIndex)),
-                    alignment: Alignment.center,
-                    child: AnimatedScale(
-                      scale: hovering ? 1.06 : 1,
-                      duration: const Duration(milliseconds: 350),
-                      child: Text(item['emoji'] ?? '', style: const TextStyle(fontSize: 80)),
+                  if (((item['avatarUrl'] as String?)?.trim() ?? '').isNotEmpty)
+                    Image.network(
+                      (item['avatarUrl'] as String).trim(),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        decoration: BoxDecoration(gradient: T.gr(gradIndex)),
+                        alignment: Alignment.center,
+                        child: Text(item['emoji'] ?? '', style: const TextStyle(fontSize: 80)),
+                      ),
+                    )
+                  else
+                    Container(
+                      decoration: BoxDecoration(gradient: T.gr(gradIndex)),
+                      alignment: Alignment.center,
+                      child: AnimatedScale(
+                        scale: hovering ? 1.06 : 1,
+                        duration: const Duration(milliseconds: 350),
+                        child: Text(item['emoji'] ?? '', style: const TextStyle(fontSize: 80)),
+                      ),
                     ),
-                  ),
                   // bottom gradient scrim
                   Align(
                     alignment: Alignment.bottomCenter,

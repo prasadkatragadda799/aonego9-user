@@ -6,7 +6,7 @@ import 'common.dart';
 Map<String, dynamic> _typeInfo(String t) =>
     portTypes[t] ?? {'label': t, 'color': T.gold.value, 'icon': '📸'};
 
-Widget _portfolioImage(Map<String, dynamic> item, {double emojiSize = 44}) {
+Widget portfolioCoverImage(Map<String, dynamic> item, {double emojiSize = 44}) {
   final url = (item['imageUrl'] as String?) ?? (item['image_url'] as String?) ?? '';
   if (url.isNotEmpty) {
     return Image.network(
@@ -195,7 +195,7 @@ class _PortCell extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  _portfolioImage(item, emojiSize: 44),
+                  portfolioCoverImage(item, emojiSize: 44),
                   if (h)
                     Container(
                       color: const Color(0x7309090B),
@@ -305,7 +305,7 @@ class _LightboxState extends State<_Lightbox> {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      _portfolioImage(item, emojiSize: 120),
+                      portfolioCoverImage(item, emojiSize: 120),
                       Positioned(left: 16, child: _Arrow(label: '‹', onTap: _prev)),
                       Positioned(right: 16, child: _Arrow(label: '›', onTap: _next)),
                     ],
