@@ -66,11 +66,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (vendorId.isEmpty) { setState(() => _detailsLoaded = true); return; }
     try {
       final details = await _repo.vendorProfileDetails(vendorId);
-      if (mounted) setState(() {
-        _mergedProfile = VendorProfileUtils.mergeDetails(_mergedProfile, details);
-        _mergedProfile['stats'] = VendorProfileUtils.buildDefaultStats(_mergedProfile);
-        _detailsLoaded = true;
-      });
+      if (mounted) {
+        setState(() {
+          _mergedProfile = VendorProfileUtils.mergeDetails(_mergedProfile, details);
+          _mergedProfile['stats'] = VendorProfileUtils.buildDefaultStats(_mergedProfile);
+          _detailsLoaded = true;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _detailsLoaded = true);
     }
@@ -161,7 +163,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Expanded(
             child: CustomScrollView(
               slivers: [
-                SliverToBoxAdapter(child: _phero(app)),
+                SliverToBoxAdapter(child: isNarrow(context) ? _pheroNarrow(app) : _phero(app)),
                 SliverToBoxAdapter(child: _reachBar(app)),
                 if ((p['stats'] as List?)?.isNotEmpty == true) SliverToBoxAdapter(child: _stats()),
                 SliverPersistentHeader(pinned: true, delegate: _TabsDelegate(_tabs, _tab, accent, (t) => setState(() => _tab = t))),
@@ -203,42 +205,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: WrapCrossAlignment.center,
               runSpacing: 10,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                // Wrap, not Row — three metrics on one fixed line overflowed a
+                // 375px phone. On mobile the labels also shorten so all three
+                // still fit across a single line.
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    for (final m in metrics) ...[
-                      Text(m[0], style: const TextStyle(fontSize: 13)),
-                      const SizedBox(width: 6),
-                      Text(m[1], style: F.fraunces(size: 16, weight: FontWeight.w700, color: accent, height: 1)),
-                      const SizedBox(width: 5),
-                      Text(m[2], style: F.syne(size: 11, weight: FontWeight.w400, color: T.mut)),
-                      const SizedBox(width: 18),
-                    ],
+                    for (final m in metrics)
+                      Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text(m[0], style: const TextStyle(fontSize: 13)),
+                        const SizedBox(width: 6),
+                        Text(m[1], style: F.fraunces(size: 16, weight: FontWeight.w700, color: accent, height: 1)),
+                        const SizedBox(width: 5),
+                        Text(isNarrow(context) ? m[2].split(' ').last : m[2],
+                            style: F.syne(size: 11, weight: FontWeight.w400, color: T.mut)),
+                      ]),
                   ],
                 ),
-                // Shareable link pill + copy.
-                HoverFx(
-                  onTap: () => _copyLink(app),
-                  builder: (h) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: T.surf,
-                      border: Border.all(color: h ? accent : T.bdr),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.link, size: 14, color: T.gold),
-                      const SizedBox(width: 7),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 240),
-                        child: Text(link.replaceFirst(RegExp(r'^https?://'), ''),
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: F.mono(size: 10, color: T.mut)),
+                // Shareable link pill + copy. Hidden on phones: the raw URL
+                // eats the whole row, and "Copy" in the top bar is the same
+                // action — so mobile keeps just the three metrics as proof.
+                if (!isNarrow(context))
+                  HoverFx(
+                    onTap: () => _copyLink(app),
+                    builder: (h) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: T.surf,
+                        border: Border.all(color: h ? accent : T.bdr),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      const SizedBox(width: 9),
-                      Text('Copy link', style: F.syne(size: 11, weight: FontWeight.w700, color: h ? accent : T.text)),
-                    ]),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.link, size: 14, color: T.gold),
+                        const SizedBox(width: 7),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 240),
+                          child: Text(link.replaceFirst(RegExp(r'^https?://'), ''),
+                              maxLines: 1, overflow: TextOverflow.ellipsis, style: F.mono(size: 10, color: T.mut)),
+                        ),
+                        const SizedBox(width: 9),
+                        Text('Copy link', style: F.syne(size: 11, weight: FontWeight.w700, color: h ? accent : T.text)),
+                      ]),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -273,6 +284,172 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Full-bleed cover art for the mobile hero — the real photo when there is
+  /// one, otherwise the category gradient with the emoji at full strength.
+  /// (The desktop hero washes the emoji out to 13% as a backdrop; at phone
+  /// width that just reads as an empty box.)
+  Widget _heroCover() {
+    final url = (p['avatarUrl'] as String?)?.trim() ?? '';
+    if (url.isNotEmpty) {
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _heroCoverFallback(),
+        loadingBuilder: (_, child, progress) => progress == null
+            ? child
+            : Container(
+                decoration: BoxDecoration(gradient: T.gr(0)),
+                alignment: Alignment.center,
+                child: const SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: T.gold),
+                ),
+              ),
+      );
+    }
+    return _heroCoverFallback();
+  }
+
+  Widget _heroCoverFallback() => Container(
+        decoration: BoxDecoration(gradient: T.gr(0)),
+        alignment: Alignment.center,
+        child: Text(p['emoji'] ?? '', style: const TextStyle(fontSize: 96)),
+      );
+
+  /// Mobile hero — image first.
+  ///
+  /// The desktop hero stacks eyebrow → name → tagline → meta → rating → three
+  /// share chips (one of which is the raw share URL) over a near-invisible
+  /// emoji. On a phone that is a wall of text above the fold with nothing to
+  /// look at, so this leads with the cover shot and the identity, exactly like
+  /// the listing card the user just tapped, and defers everything else.
+  Widget _pheroNarrow(AppState app) {
+    final catName = cats.firstWhere((c) => c['id'] == cat, orElse: () => {'name': ''})['name'];
+    final rating = (p['rating'] as num?)?.toDouble() ?? 0;
+    final tagline = (p['tagline'] ?? '').toString();
+
+    return Container(
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: T.bdr))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Cover + identity ──
+          SizedBox(
+            height: 320,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _heroCover(),
+                // Scrim so the name stays legible over any photo.
+                const Align(
+                  alignment: Alignment.bottomCenter,
+                  child: FractionallySizedBox(
+                    heightFactor: .62,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Color(0xF509090B)],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (p['verified'] == true)
+                  Positioned(
+                    top: 14,
+                    right: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(4)),
+                      child: Text('✓ VERIFIED',
+                          style: F.syne(size: 10, weight: FontWeight.w700, color: T.bg, letterSpacing: .5)),
+                    ),
+                  ),
+                Positioned(
+                  left: 18,
+                  right: 18,
+                  bottom: 16,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(mainAxisSize: MainAxisSize.min, children: [
+                        Container(width: 14, height: 1.5, color: accent),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text('$catName · ${p['badge']}'.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: F.syne(size: 10, weight: FontWeight.w700, color: accent, letterSpacing: 2)),
+                        ),
+                      ]),
+                      const SizedBox(height: 9),
+                      Text(p['name'] ?? '',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: F.fraunces(
+                              size: 30, weight: FontWeight.w700, color: Colors.white, letterSpacing: -.8, height: 1.08)),
+                      const SizedBox(height: 5),
+                      Text('📍 ${p['loc']}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: F.syne(size: 12, weight: FontWeight.w600, color: accent)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // ── Tagline, proof, share ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (tagline.isNotEmpty) ...[
+                  Text(tagline, style: F.syne(size: 13.5, weight: FontWeight.w400, color: T.mut, height: 1.6)),
+                  const SizedBox(height: 12),
+                ],
+                Wrap(
+                  spacing: 14,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text(rating.toStringAsFixed(1),
+                          style: F.fraunces(size: 18, weight: FontWeight.w700, color: accent)),
+                      const SizedBox(width: 6),
+                      Text('★' * rating.floor(),
+                          style: TextStyle(color: accent, fontSize: 12, letterSpacing: 1.5)),
+                      const SizedBox(width: 6),
+                      Text('(${p['reviewCount']})', style: F.syne(size: 12, weight: FontWeight.w400, color: T.dim)),
+                    ]),
+                    if (VendorProfileUtils.hasText(p['exp']))
+                      Text('🎯 ${VendorProfileUtils.displayValue(p['exp'])}',
+                          style: F.syne(size: 12, weight: FontWeight.w400, color: T.dim)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                // Share only — the raw share URL chip is dropped here because
+                // "Copy" in the top bar already does exactly that.
+                Row(children: [
+                  _HeroChip(text: '💬 WhatsApp', onTap: () => _share(app, 'WhatsApp')),
+                  const SizedBox(width: 8),
+                  _HeroChip(text: '📤 Share', onTap: () => _share(app, 'Profile')),
+                ]),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── phero ──
   Widget _phero(AppState app) {
     final catName = cats.firstWhere((c) => c['id'] == cat, orElse: () => {'name': ''})['name'];
@@ -299,9 +476,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           // gradient overlay
-          Positioned.fill(
+          const Positioned.fill(
             child: DecoratedBox(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
@@ -464,8 +641,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                     decoration: BoxDecoration(
-                      color: T.grn.withOpacity(.08),
-                      border: Border.all(color: T.grn.withOpacity(.2)),
+                      color: T.grn.withValues(alpha: .08),
+                      border: Border.all(color: T.grn.withValues(alpha: .2)),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text('✓ Verified Profile', style: F.syne(size: 10, weight: FontWeight.w700, color: T.grn)),
@@ -594,8 +771,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Container(
             width: 68, height: 68,
             decoration: BoxDecoration(
-              color: T.gold.withOpacity(.1),
-              border: Border.all(color: T.gold.withOpacity(.25)),
+              color: T.gold.withValues(alpha: .1),
+              border: Border.all(color: T.gold.withValues(alpha: .25)),
               borderRadius: BorderRadius.circular(10),
             ),
             clipBehavior: Clip.antiAlias,
@@ -614,7 +791,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
               decoration: BoxDecoration(color: T.surf, border: Border.all(color: T.bdr), borderRadius: BorderRadius.circular(4)),
-              child: Text('AONEGO9.COM REPRESENTED TALENT', style: F.syne(size: 9, weight: FontWeight.w700, color: T.dim, letterSpacing: 1.5)),
+              child: Text('AONEGO9.COM REPRESENTED TALENT', style: F.syne(size: 10, weight: FontWeight.w700, color: T.dim, letterSpacing: 1.5)),
             ),
           ]),
         ]),
@@ -717,12 +894,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SizedBox(
               width: w,
               child: HoverFx(
-                onTap: () => _toast('Full view', port[i]['label'] ?? port[i]['sub'] ?? '', '🖼️'),
+                // Was a "Full view" toast that never opened one. Photographers,
+                // videographers, venues and event profiles all land here, so
+                // four of six categories had no way to actually see a shot.
+                onTap: () => openPortfolioLightbox(
+                  context,
+                  items: port,
+                  index: i,
+                  accent: accent,
+                  onToast: _toast,
+                ),
                 builder: (h) => AspectRatio(
                   aspectRatio: .78,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 250),
-                    transform: h ? (Matrix4.identity()..scale(1.02)) : Matrix4.identity(),
+                    transform: h ? (Matrix4.identity()..scaleByDouble(1.02, 1.02, 1.02, 1)) : Matrix4.identity(),
                     transformAlignment: Alignment.center,
                     decoration: BoxDecoration(border: Border.all(color: h ? T.gold : T.bdr), borderRadius: BorderRadius.circular(9)),
                     clipBehavior: Clip.antiAlias,
@@ -733,7 +919,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(color: const Color(0xD909090B), borderRadius: BorderRadius.circular(3)),
-                          child: Text('${port[i]['label']}'.toUpperCase(), style: F.syne(size: 9, weight: FontWeight.w700, color: T.gold, letterSpacing: 1.2)),
+                          child: Text('${port[i]['label']}'.toUpperCase(), style: F.syne(size: 10, weight: FontWeight.w700, color: T.gold, letterSpacing: 1.2)),
                         ),
                       ),
                       if (h)
@@ -748,7 +934,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                               Text(port[i]['label'] ?? '', style: F.syne(size: 12, weight: FontWeight.w700, color: Colors.white)),
                               const SizedBox(height: 2),
-                              Text(port[i]['sub'] ?? '', style: F.syne(size: 10, weight: FontWeight.w400, color: Colors.white.withOpacity(.5))),
+                              Text(port[i]['sub'] ?? '', style: F.syne(size: 10, weight: FontWeight.w400, color: Colors.white.withValues(alpha: .5))),
                             ]),
                           ),
                         ),
@@ -828,7 +1014,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Row(children: [
                   Container(
                     width: 42, height: 42,
-                    decoration: BoxDecoration(color: T.gold.withOpacity(.1), border: Border.all(color: T.gold.withOpacity(.2)), borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(color: T.gold.withValues(alpha: .1), border: Border.all(color: T.gold.withValues(alpha: .2)), borderRadius: BorderRadius.circular(8)),
                     alignment: Alignment.center,
                     child: Text(r['e'] ?? '▶', style: const TextStyle(fontSize: 14)),
                   ),
@@ -855,7 +1041,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Row(children: [
                 Container(
                   width: 28, height: 28,
-                  decoration: BoxDecoration(color: T.gold.withOpacity(.1), border: Border.all(color: T.gold.withOpacity(.18)), borderRadius: BorderRadius.circular(6)),
+                  decoration: BoxDecoration(color: T.gold.withValues(alpha: .1), border: Border.all(color: T.gold.withValues(alpha: .18)), borderRadius: BorderRadius.circular(6)),
                   alignment: Alignment.center,
                   child: Text(equip[i]['e'] ?? '', style: const TextStyle(fontSize: 13)),
                 ),
@@ -957,9 +1143,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ));
     }
     final legend = [
-      [T.grn, T.grn.withOpacity(.3), 'Open'],
-      [T.red, T.red.withOpacity(.2), 'Booked'],
-      [accent, accent.withOpacity(.13), 'Today'],
+      [T.grn, T.grn.withValues(alpha: .3), 'Open'],
+      [T.redText, T.red.withValues(alpha: .2), 'Booked'],
+      [accent, accent.withValues(alpha: .13), 'Today'],
     ];
     return Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const BlkHeader('Availability Calendar — This Month'),
@@ -980,7 +1166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         mainAxisSpacing: 4,
         children: [
           for (final d in 'SMTWTFS'.split(''))
-            Center(child: Text(d, style: F.syne(size: 9, weight: FontWeight.w700, color: T.dim, letterSpacing: .5))),
+            Center(child: Text(d, style: F.syne(size: 10, weight: FontWeight.w700, color: T.dim, letterSpacing: .5))),
           for (int i = 0; i < avail.length; i++) _availDay(i + 1, avail[i]),
         ],
       ),
@@ -990,9 +1176,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _availDay(int n, String s) {
     Color bg = Colors.transparent, border = Colors.transparent, fg = T.dim;
     if (s == 'open') {
-      bg = T.grn.withOpacity(.1); border = T.grn.withOpacity(.22); fg = T.grn;
+      bg = T.grn.withValues(alpha: .1); border = T.grn.withValues(alpha: .22); fg = T.grn;
     } else if (s == 'busy') {
-      bg = T.red.withOpacity(.07); border = T.red.withOpacity(.18); fg = T.red;
+      bg = T.red.withValues(alpha: .07); border = T.red.withValues(alpha: .18); fg = T.redText;
     } else if (s == 'today') {
       border = T.gold; fg = T.gold;
     }
@@ -1004,64 +1190,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Text('$n', style: F.mono(size: 10, color: fg, )),
       ),
     );
-  }
-
-  Widget _eventPackages() {
-    final pkgs = (p['eventPackages'] as List?)?.cast<Map>() ?? [];
-    final addons = (p['addons'] as List?)?.cast<Map>() ?? [];
-    final featTwoCol = screenW(context) > 768;
-    return Column(children: [
-      for (final pk in pkgs)
-        Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: pk['pop'] == true ? T.gold.withOpacity(.03) : null,
-            border: Border.all(color: pk['pop'] == true ? T.gold : T.bdr),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: T.bdr))),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Text('${pk['tier']} Package'.toUpperCase(), style: F.syne(size: 10, weight: FontWeight.w700, color: accent, letterSpacing: 2)),
-                const SizedBox(height: 3),
-                Text(pk['name'] ?? '', style: F.fraunces(size: 20, weight: FontWeight.w700, color: T.cream)),
-                const SizedBox(height: 3),
-                Text.rich(TextSpan(children: [
-                  TextSpan(text: pk['price'], style: F.fraunces(size: 28, weight: FontWeight.w700, color: accent)),
-                  TextSpan(text: ' onwards', style: F.syne(size: 13, weight: FontWeight.w400, color: T.mut)),
-                ])),
-              ]),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-              child: _featGrid((pk['feats'] as List).cast<String>(), featTwoCol, check: true),
-            ),
-          ]),
-        ),
-      Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const BlkHeader('Add-On Services'),
-        LayoutBuilder(builder: (context, bc) {
-          const gap = 8.0;
-          final w = featTwoCol ? (bc.maxWidth - gap) / 2 : bc.maxWidth;
-          return Wrap(spacing: gap, runSpacing: gap, children: [
-            for (final a in addons)
-              Container(
-                width: w,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                decoration: BoxDecoration(color: T.surf, border: Border.all(color: T.bdr), borderRadius: BorderRadius.circular(7)),
-                child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Flexible(child: Text(a['name'] ?? '', style: F.syne(size: 12, weight: FontWeight.w400, color: T.mut))),
-                  const SizedBox(width: 8),
-                  Text(a['price'] ?? '', style: F.fraunces(size: 14, weight: FontWeight.w700, color: accent)),
-                ]),
-              ),
-          ]);
-        }),
-      ])),
-    ]);
   }
 
   Widget _packages() {
@@ -1086,7 +1214,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           builder: (h) => Container(
             margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
-              color: pk['pop'] == true ? T.gold.withOpacity(.04) : null,
+              color: pk['pop'] == true ? T.gold.withValues(alpha: .04) : null,
               border: Border.all(color: (pk['pop'] == true || h) ? T.gold : T.bdr),
               borderRadius: BorderRadius.circular(10),
             ),
@@ -1116,7 +1244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(20)),
-                    child: Text('POPULAR', style: F.syne(size: 9, weight: FontWeight.w700, color: T.bg, letterSpacing: 1)),
+                    child: Text('POPULAR', style: F.syne(size: 10, weight: FontWeight.w700, color: T.bg, letterSpacing: 1)),
                   ),
                 ),
             ]),
@@ -1169,7 +1297,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(color: T.surf, border: Border.all(color: T.bdr), borderRadius: BorderRadius.circular(10)),
         child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-          Text('${avgRating.toStringAsFixed(1)}', style: F.fraunces(size: 52, weight: FontWeight.w700, color: accent, height: 1)),
+          Text(avgRating.toStringAsFixed(1), style: F.fraunces(size: 52, weight: FontWeight.w700, color: accent, height: 1)),
           const SizedBox(width: 20),
           Expanded(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -1186,7 +1314,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    SizedBox(width: 16, child: Text('${(reviewCount * row[1] / 100).round()}', style: F.mono(size: 9, color: T.dim))),
+                    SizedBox(width: 22, child: Text('${(reviewCount * row[1] / 100).round()}', style: F.mono(size: 10, color: T.dim))),
                   ]),
                 ),
             ]),
@@ -1226,7 +1354,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
             width: 36, height: 36,
-            decoration: BoxDecoration(color: T.gold.withOpacity(.12), border: Border.all(color: T.gold.withOpacity(.2)), borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(color: T.gold.withValues(alpha: .12), border: Border.all(color: T.gold.withValues(alpha: .2)), borderRadius: BorderRadius.circular(8)),
             alignment: Alignment.center,
             child: Text(initials.length > 2 ? initials.substring(0, 2) : initials, style: F.fraunces(size: 13, weight: FontWeight.w700, color: accent)),
           ),
@@ -1247,7 +1375,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 9),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-            decoration: BoxDecoration(color: T.gold.withOpacity(.07), border: Border.all(color: T.gold.withOpacity(.15)), borderRadius: BorderRadius.circular(20)),
+            decoration: BoxDecoration(color: T.gold.withValues(alpha: .07), border: Border.all(color: T.gold.withValues(alpha: .15)), borderRadius: BorderRadius.circular(20)),
             child: Text(r['tag'], style: F.syne(size: 10, weight: FontWeight.w600, color: accent)),
           ),
         ],
@@ -1268,7 +1396,7 @@ class _PnavBtn extends StatelessWidget {
         builder: (h) => Container(
           padding: EdgeInsets.symmetric(horizontal: back ? 14 : 12, vertical: back ? 6 : 5),
           decoration: BoxDecoration(
-            color: back ? null : Colors.white.withOpacity(.03),
+            color: back ? null : Colors.white.withValues(alpha: .03),
             border: Border.all(color: h ? (back ? T.bdhi : T.gold) : T.bdr),
             borderRadius: BorderRadius.circular(back ? 6 : 5),
           ),
@@ -1289,8 +1417,8 @@ class _HeroChip extends StatelessWidget {
         builder: (h) => Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(.04),
-            border: Border.all(color: h ? (mono ? T.gold : T.bdhi) : Colors.white.withOpacity(.08)),
+            color: Colors.white.withValues(alpha: .04),
+            border: Border.all(color: h ? (mono ? T.gold : T.bdhi) : Colors.white.withValues(alpha: .08)),
             borderRadius: BorderRadius.circular(5),
           ),
           child: Text(text,

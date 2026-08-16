@@ -67,8 +67,7 @@ class _TickerState extends State<Ticker> with SingleTickerProviderStateMixin {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 28),
                     child: Text('${items[i]}    ◆    ',
-                        style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w600, color: T.bg)),
+                        style: F.syne(size: 11, weight: FontWeight.w700, color: T.bg)),
                   ),
                 ),
               ),
@@ -83,12 +82,9 @@ class _TickerState extends State<Ticker> with SingleTickerProviderStateMixin {
               children: [
                 _Dot(),
                 const SizedBox(width: 5),
-                const Text('LIVE',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 2)),
+                Text('LIVE',
+                    style: F.syne(
+                        size: 10, weight: FontWeight.w700, color: Colors.white, letterSpacing: 2)),
               ],
             ),
           ),

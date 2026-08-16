@@ -25,7 +25,7 @@ class ListingCard extends StatelessWidget {
         transform: Matrix4.translationValues(0, hovering ? -4 : 0, 0),
         decoration: BoxDecoration(
           color: T.card,
-          border: Border.all(color: hovering ? accent.withOpacity(.25) : T.bdr),
+          border: Border.all(color: hovering ? accent.withValues(alpha: .25) : T.bdr),
           borderRadius: BorderRadius.circular(13),
           boxShadow: hovering
               ? const [BoxShadow(color: Color(0x99000000), blurRadius: 48, offset: Offset(0, 20))]
@@ -102,7 +102,7 @@ class ListingCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(4)),
                         child: Text('✓ VERIFIED',
-                            style: F.syne(size: 9, weight: FontWeight.w700, color: T.bg, letterSpacing: .5)),
+                            style: F.syne(size: 10, weight: FontWeight.w700, color: T.bg, letterSpacing: .5)),
                       ),
                     ),
                   if (item['isNew'] == true)
@@ -113,7 +113,7 @@ class ListingCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(color: T.grn, borderRadius: BorderRadius.circular(3)),
                         child: Text('NEW',
-                            style: F.syne(size: 8, weight: FontWeight.w700, color: T.bg)),
+                            style: F.syne(size: 10, weight: FontWeight.w700, color: T.bg)),
                       ),
                     ),
                   // name + loc
@@ -126,9 +126,13 @@ class ListingCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(item['name'] ?? '',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: F.fraunces(size: 19, weight: FontWeight.w700, color: Colors.white, height: 1.15)),
                         const SizedBox(height: 2),
                         Text('📍 ${item['loc'] ?? ''}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: F.syne(size: 11, weight: FontWeight.w600, color: accent)),
                       ],
                     ),
@@ -215,10 +219,10 @@ class _Pill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
         color: const Color(0xE009090B),
-        border: Border.all(color: Colors.white.withOpacity(.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: .1)),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(text, style: F.syne(size: 9, weight: FontWeight.w700, color: color, letterSpacing: 1.5)),
+      child: Text(text, style: F.syne(size: 10, weight: FontWeight.w700, color: color, letterSpacing: 1.5)),
     );
   }
 }
@@ -234,8 +238,8 @@ class _CardCta extends StatelessWidget {
       builder: (h) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: h ? accent.withOpacity(.07) : Colors.transparent,
-          border: Border.all(color: Colors.white.withOpacity(.08)),
+          color: h ? accent.withValues(alpha: .07) : Colors.transparent,
+          border: Border.all(color: Colors.white.withValues(alpha: .08)),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text('View Profile →', style: F.syne(size: 12, weight: FontWeight.w700, color: accent)),

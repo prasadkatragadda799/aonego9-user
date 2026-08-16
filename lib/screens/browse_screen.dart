@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
 import '../data/app_data.dart';
 import '../state/app_state.dart';
+import '../widgets/brand.dart';
 import '../widgets/common.dart';
 import '../widgets/ticker.dart';
 import '../widgets/listing_card.dart';
+import '../widgets/footer.dart';
 
 /// Browse view — ticker, nav, hero, category rail, filters, listing grid.
 class BrowseScreen extends StatelessWidget {
@@ -25,7 +27,7 @@ class BrowseScreen extends StatelessWidget {
       child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: Ticker(accent: accent)),
-          SliverPersistentHeader(pinned: true, delegate: _NavDelegate(app, accent, app.location)),
+          SliverPersistentHeader(pinned: true, delegate: _NavDelegate(app, accent, app.location, w)),
           SliverToBoxAdapter(
             child: Center(
               child: ConstrainedBox(
@@ -37,12 +39,13 @@ class BrowseScreen extends StatelessWidget {
                     _catRail(app, accent),
                     _listBar(context, app, accent, catInfo, items.length),
                     _grid(context, app, accent, items, w),
-                    const SizedBox(height: 80),
+                    const SizedBox(height: 72),
                   ],
                 ),
               ),
             ),
           ),
+          const SliverToBoxAdapter(child: SiteFooter()),
         ],
       ),
     );
@@ -126,7 +129,13 @@ class BrowseScreen extends StatelessWidget {
         runSpacing: 10,
         spacing: 10,
         children: [
-          Text('$count available · ${cat['name']} · 📍 ${app.location}', style: F.mono(size: 11, color: T.dim)),
+          // Constrained so a long category + city string wraps instead of
+          // overflowing the row on a phone.
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: screenW(context) - (isNarrow(context) ? 32 : 40)),
+            child: Text('$count available · ${cat['name']} · 📍 ${app.location}',
+                style: F.mono(size: 11, color: T.dim)),
+          ),
           Wrap(
             spacing: 5,
             runSpacing: 5,
@@ -154,7 +163,7 @@ class BrowseScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('📍', style: const TextStyle(fontSize: 30)),
+              const Text('📍', style: TextStyle(fontSize: 30)),
               const SizedBox(height: 10),
               Text('Nothing in this category in ${app.location} yet',
                   style: F.syne(size: 14, weight: FontWeight.w600, color: T.mut)),
@@ -211,7 +220,12 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
   final AppState app;
   final Color accent;
   final String location;
-  _NavDelegate(this.app, this.accent, this.location);
+
+  /// Carried so [shouldRebuild] fires on resize — the nav's responsive
+  /// breakpoints are read inside [build], and without this the header would
+  /// keep a stale desktop/mobile layout after the window changed size.
+  final double width;
+  _NavDelegate(this.app, this.accent, this.location, this.width);
 
   @override
   double get minExtent => 58;
@@ -221,6 +235,13 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     final narrow = isNarrow(context);
+    // Six category links plus both button clusters need ~1100px. Below that
+    // they were clipping mid-word ("Event Se…"), so drop them and let the
+    // category rail directly underneath carry navigation — it lists the exact
+    // same six categories with live counts, so nothing becomes unreachable.
+    final showNavLinks = screenW(context) > 1100;
+    // Vendor Portal survives a bit further down before it has to go.
+    final showVendorBtn = screenW(context) > 880;
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xF709090B),
@@ -233,26 +254,24 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                // Logo
-                GestureDetector(
-                  onTap: () => app.switchCat('modelF'),
-                  child: Text.rich(
-                    TextSpan(
-                      style: F.fraunces(size: 20, weight: FontWeight.w700, color: T.cream),
-                      children: [
-                        const TextSpan(text: 'AOne'),
-                        TextSpan(text: 'Go9', style: F.fraunces(size: 20, weight: FontWeight.w700, color: T.gold)),
-                        TextSpan(text: '.com', style: F.syne(size: 10, weight: FontWeight.w400, color: T.dim)),
-                      ],
+                // Logo — the brand mark, home affordance.
+                Tooltip(
+                  message: 'AOneGo9 — back to browse',
+                  child: HoverFx(
+                    onTap: () => app.switchCat('modelF'),
+                    builder: (h) => AnimatedOpacity(
+                      duration: const Duration(milliseconds: 160),
+                      opacity: h ? .82 : 1,
+                      child: BrandLogo(size: narrow ? 17 : 20),
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 // Location picker — the whole marketplace filters to this city.
-                _LocationChip(app: app),
+                _LocationChip(app: app, compact: narrow),
                 const SizedBox(width: 8),
                 // Links
-                if (!narrow)
+                if (showNavLinks)
                   Expanded(
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -269,7 +288,7 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
                   const Spacer(),
                 const SizedBox(width: 8),
                 // Right
-                if (!narrow) ...[
+                if (showVendorBtn) ...[
                   _GhostBtn(label: 'Vendor Portal', onTap: () => app.setView('vendor-auth')),
                   const SizedBox(width: 8),
                 ],
@@ -293,7 +312,11 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _NavDelegate old) =>
-      old.app.activeCat != app.activeCat || old.accent != accent || old.location != location;
+      old.app.activeCat != app.activeCat ||
+      old.accent != accent ||
+      old.location != location ||
+      old.width != width ||
+      old.app.isLoggedIn != app.isLoggedIn;
 }
 
 class _NavLink extends StatelessWidget {
@@ -302,14 +325,35 @@ class _NavLink extends StatelessWidget {
   final VoidCallback onTap;
   const _NavLink({required this.cat, required this.active, required this.onTap});
   @override
-  Widget build(BuildContext context) => HoverFx(
-        onTap: onTap,
-        builder: (h) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Text('${cat['icon']} ${cat['name']}',
-              style: F.syne(size: 12, weight: FontWeight.w600, color: active ? T.ac(cat['id']) : (h ? T.text : T.mut))),
+  Widget build(BuildContext context) {
+    final accent = T.ac(cat['id']);
+    // Label only — the emoji + count live on the category rail below, and
+    // carrying them here too pushed all six links past the available width.
+    return HoverFx(
+      onTap: onTap,
+      builder: (h) => AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: active ? accent : Colors.transparent,
+              width: 1.5,
+            ),
+          ),
         ),
-      );
+        child: Text(
+          cat['name'],
+          maxLines: 1,
+          style: F.syne(
+            size: 12,
+            weight: active ? FontWeight.w700 : FontWeight.w600,
+            color: active ? accent : (h ? T.text : T.mut),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _GhostBtn extends StatelessWidget {
@@ -322,8 +366,8 @@ class _GhostBtn extends StatelessWidget {
         builder: (h) => Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
-            color: T.gold.withOpacity(.06),
-            border: Border.all(color: T.gold.withOpacity(.3)),
+            color: T.gold.withValues(alpha: .06),
+            border: Border.all(color: T.gold.withValues(alpha: .3)),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(label, style: F.syne(size: 12, weight: FontWeight.w700, color: T.gold)),
@@ -388,11 +432,15 @@ class _CTab extends StatelessWidget {
 /// Location picker — switches the city the whole marketplace is filtered to.
 class _LocationChip extends StatelessWidget {
   final AppState app;
-  const _LocationChip({required this.app});
+
+  /// On phones the city label is dropped so the nav row never overflows —
+  /// the pin + chevron still read as a picker, and the tooltip names the city.
+  final bool compact;
+  const _LocationChip({required this.app, this.compact = false});
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
-      tooltip: 'Change location',
+      tooltip: 'Location: ${app.location} — tap to change',
       color: T.surf,
       elevation: 8,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: T.bdr)),
@@ -402,7 +450,7 @@ class _LocationChip extends StatelessWidget {
         PopupMenuItem(
           enabled: false,
           height: 30,
-          child: Text('YOUR LOCATION', style: F.syne(size: 9, weight: FontWeight.w700, color: T.dim, letterSpacing: 1.5)),
+          child: Text('YOUR LOCATION', style: F.syne(size: 10, weight: FontWeight.w700, color: T.dim, letterSpacing: 1.5)),
         ),
         for (final c in AppState.cities)
           PopupMenuItem(
@@ -418,18 +466,20 @@ class _LocationChip extends StatelessWidget {
           ),
       ],
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 11, vertical: 7),
         decoration: BoxDecoration(
-          color: T.gold.withOpacity(.06),
-          border: Border.all(color: T.gold.withOpacity(.3)),
+          color: T.gold.withValues(alpha: .08),
+          border: Border.all(color: T.gold.withValues(alpha: .35)),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.location_on, size: 14, color: T.gold),
-            const SizedBox(width: 6),
-            Text(app.location, style: F.syne(size: 12, weight: FontWeight.w700, color: T.gold)),
+            if (!compact) ...[
+              const SizedBox(width: 6),
+              Text(app.location, style: F.syne(size: 12, weight: FontWeight.w700, color: T.gold)),
+            ],
             const SizedBox(width: 2),
             const Icon(Icons.keyboard_arrow_down, size: 15, color: T.gold),
           ],

@@ -13,6 +13,10 @@ dependencies:
   google_fonts: ^6.2.1
   provider: ^6.1.2
   http: ^1.2.2
+  # Directly imported by data/api_client.dart for MediaType on multipart
+  # uploads. Declared explicitly rather than relied on as a transitive dep of
+  # `http`, so a future http release can't silently break the build.
+  http_parser: ^4.0.2
   shared_preferences: ^2.3.3
   image_picker: ^1.1.2
   qr_flutter: ^4.1.0
@@ -22,3 +26,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    # Brand artwork — see assets/brand/README.md. Listed file-by-file rather
+    # than as a directory so the README isn't shipped in the web bundle.
+    - assets/brand/aonego9_logo.png
+    - assets/brand/aonego9_lockup.png

@@ -4,21 +4,53 @@ import '../data/app_data.dart';
 import 'common.dart';
 
 Map<String, dynamic> _typeInfo(String t) =>
-    portTypes[t] ?? {'label': t, 'color': T.gold.value, 'icon': '📸'};
+    portTypes[t] ?? {'label': t, 'color': T.gold.toARGB32(), 'icon': '📸'};
 
-Widget portfolioCoverImage(Map<String, dynamic> item, {double emojiSize = 44}) {
+/// Renders a portfolio item's cover.
+///
+/// [fit] defaults to [BoxFit.cover], which is what the uniform grid cells want
+/// — every tile fills its square. The lightbox must pass [BoxFit.contain]
+/// instead: it shows the photo at full size, and cropping it there would hide
+/// exactly the part of the shot the user opened it to see.
+Widget portfolioCoverImage(
+  Map<String, dynamic> item, {
+  double emojiSize = 44,
+  BoxFit fit = BoxFit.cover,
+}) {
   final url = (item['imageUrl'] as String?) ?? (item['image_url'] as String?) ?? '';
-  if (url.isNotEmpty) {
-    return Image.network(
-      url,
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-      errorBuilder: (_, __, ___) => Container(
+
+  Widget fallback() => Container(
         decoration: BoxDecoration(gradient: T.gr((item['bg'] as int?) ?? 0)),
         alignment: Alignment.center,
         child: Text(item['emoji'] ?? '', style: TextStyle(fontSize: emojiSize)),
-      ),
+      );
+
+  if (url.isNotEmpty) {
+    return Image.network(
+      url,
+      fit: fit,
+      // `contain` must size to the available box and letterbox inside it;
+      // forcing infinite extents is only right when the image fills the cell.
+      width: fit == BoxFit.contain ? null : double.infinity,
+      height: fit == BoxFit.contain ? null : double.infinity,
+      errorBuilder: (_, __, ___) => fallback(),
+      loadingBuilder: (_, child, progress) {
+        if (progress == null) return child;
+        // Full-size portfolio shots are heavy — without this the lightbox is
+        // blank while they download, which reads as a broken image.
+        final expected = progress.expectedTotalBytes;
+        return Center(
+          child: SizedBox(
+            height: 28,
+            width: 28,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: T.gold,
+              value: expected != null ? progress.cumulativeBytesLoaded / expected : null,
+            ),
+          ),
+        );
+      },
     );
   }
   return Container(
@@ -56,83 +88,157 @@ class _ModelGalleryState extends State<ModelGallery> {
     final filtered = _filtered;
 
     final w = screenW(context);
-    final cols = w <= 480 ? 2 : 3;
+    final narrow = w <= 480;
+    final cols = narrow ? 2 : 3;
+    // 'all' plus a single type filters nothing — both chips show the same
+    // posts — so the row is only worth its space once there are 2+ real types.
+    final showFilters = activeFilters.length > 2;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Story-circle filters
-        SizedBox(
-          height: 86,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: activeFilters.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 14),
-            itemBuilder: (_, i) {
-              final sf = activeFilters[i];
-              final active = _filter == sf['id'];
-              return _StoryButton(
-                icon: sf['icon']!,
-                label: sf['label']!,
-                active: active,
-                onTap: () => setState(() => _filter = sf['id']!),
-              );
-            },
+        if (showFilters) ...[
+          SizedBox(
+            // Story circles are an IG-style flourish that needs room; on a
+            // phone they ate 86px of the fold, so there they become chips.
+            height: narrow ? 36 : 86,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: activeFilters.length,
+              separatorBuilder: (_, __) => SizedBox(width: narrow ? 8 : 14),
+              itemBuilder: (_, i) {
+                final sf = activeFilters[i];
+                final active = _filter == sf['id'];
+                return _StoryButton(
+                  icon: sf['icon']!,
+                  label: sf['label']!,
+                  active: active,
+                  compact: narrow,
+                  onTap: () => setState(() => _filter = sf['id']!),
+                );
+              },
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
+          const SizedBox(height: 10),
+        ],
         Text(
           '${filtered.length} post${filtered.length != 1 ? 's' : ''}'
           '${_filter != 'all' ? ' · ${_typeInfo(_filter)['label']}' : ''}',
           style: F.mono(size: 11, color: T.dim),
         ),
         const SizedBox(height: 12),
-        // Grid
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: filtered.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: cols,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: .72,
-          ),
-          itemBuilder: (_, i) => _PortCell(
-            item: filtered[i],
-            onTap: () => _openLightbox(context, filtered, i),
-          ),
-        ),
+        // Grid — sized from the caption's real height rather than a fixed
+        // aspect ratio. At 2 columns on a 375px phone `.72` left the caption
+        // ~61px for ~98px of content, so headlines were sliced in half.
+        LayoutBuilder(builder: (context, bc) {
+          const gap = 14.0;
+          final cellW = (bc.maxWidth - gap * (cols - 1)) / cols;
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filtered.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: cols,
+              crossAxisSpacing: gap,
+              mainAxisSpacing: gap,
+              // square cover + caption block
+              mainAxisExtent: cellW + _PortCell.captionHeight,
+            ),
+            itemBuilder: (_, i) => _PortCell(
+              item: filtered[i],
+              compact: narrow,
+              onTap: () => _openLightbox(context, filtered, i),
+            ),
+          );
+        }),
       ],
     );
   }
 
-  void _openLightbox(BuildContext context, List<Map<String, dynamic>> filtered, int index) {
-    showGeneralDialog(
-      context: context,
-      barrierColor: const Color(0xF2000000),
-      barrierDismissible: true,
-      barrierLabel: 'lightbox',
-      transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (_, __, ___) => _Lightbox(
+  void _openLightbox(BuildContext context, List<Map<String, dynamic>> filtered, int index) =>
+      openPortfolioLightbox(
+        context,
         items: filtered,
-        start: index,
+        index: index,
         accent: widget.accent,
         onToast: widget.onToast,
-      ),
-      transitionBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
-    );
-  }
+      );
+}
+
+/// Opens the full-size portfolio viewer.
+///
+/// Shared by the model Gallery tab and the generic Portfolio tab — the
+/// repository maps every portfolio record to both field shapes
+/// (`label`/`sub` and `headline`/`desc`/`type`), so the same items drive both.
+void openPortfolioLightbox(
+  BuildContext context, {
+  required List<Map<String, dynamic>> items,
+  required int index,
+  required Color accent,
+  required void Function(String, String, String) onToast,
+}) {
+  if (items.isEmpty) return;
+  showGeneralDialog(
+    context: context,
+    barrierColor: const Color(0xF2000000),
+    barrierDismissible: true,
+    barrierLabel: 'lightbox',
+    transitionDuration: const Duration(milliseconds: 200),
+    pageBuilder: (_, __, ___) => _Lightbox(
+      items: items,
+      start: index.clamp(0, items.length - 1),
+      accent: accent,
+      onToast: onToast,
+    ),
+    transitionBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
+  );
 }
 
 class _StoryButton extends StatelessWidget {
   final String icon, label;
   final bool active;
+  final bool compact;
   final VoidCallback onTap;
-  const _StoryButton({required this.icon, required this.label, required this.active, required this.onTap});
+  const _StoryButton({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (compact) {
+      // Phone form: a filter chip that reads as a filter, matching the ones on
+      // the browse screen, instead of a 58px avatar-sized circle.
+      return HoverFx(
+        onTap: onTap,
+        builder: (h) => AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active ? T.gold.withValues(alpha: .10) : T.surf,
+            border: Border.all(color: active ? T.gold : ((h) ? T.bdhi : T.bdr)),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(icon, style: const TextStyle(fontSize: 12)),
+              const SizedBox(width: 6),
+              Text(label,
+                  maxLines: 1,
+                  style: F.syne(
+                      size: 12,
+                      weight: active ? FontWeight.w700 : FontWeight.w600,
+                      color: active ? T.gold : T.mut)),
+            ],
+          ),
+        ),
+      );
+    }
     return HoverFx(
       onTap: onTap,
       builder: (h) => Column(
@@ -145,7 +251,7 @@ class _StoryButton extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: active
-                  ? LinearGradient(colors: [T.gold, T.gold.withOpacity(.4)], begin: Alignment.topLeft, end: Alignment.bottomRight)
+                  ? LinearGradient(colors: [T.gold, T.gold.withValues(alpha: .4)], begin: Alignment.topLeft, end: Alignment.bottomRight)
                   : null,
               color: active ? null : T.bdr,
             ),
@@ -167,9 +273,15 @@ class _StoryButton extends StatelessWidget {
 }
 
 class _PortCell extends StatelessWidget {
+  /// Fixed height of the caption block under the square cover, so the grid can
+  /// size each cell as `cellWidth + captionHeight` and nothing gets clipped:
+  ///   10 top pad + 18 type pill + 4 + 17 headline + 4 + 33 desc(2 lines) + 12 bottom pad
+  static const double captionHeight = 98;
+
   final Map<String, dynamic> item;
   final VoidCallback onTap;
-  const _PortCell({required this.item, required this.onTap});
+  final bool compact;
+  const _PortCell({required this.item, required this.onTap, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
@@ -205,7 +317,7 @@ class _PortCell extends StatelessWidget {
                         height: 36,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white.withOpacity(.6), width: 1.5),
+                          border: Border.all(color: Colors.white.withValues(alpha: .6), width: 1.5),
                         ),
                         child: const Center(child: Text('⤢', style: TextStyle(fontSize: 14, color: Colors.white))),
                       ),
@@ -220,14 +332,21 @@ class _PortCell extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.fromLTRB(5, 2, 8, 2),
+                      padding: const EdgeInsets.fromLTRB(6, 2, 8, 2),
                       decoration: BoxDecoration(
-                        color: tColor.withOpacity(.10),
-                        border: Border.all(color: tColor.withOpacity(.22)),
+                        color: tColor.withValues(alpha: .10),
+                        border: Border.all(color: tColor.withValues(alpha: .22)),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Text('${ti['icon']} ${ti['label']}',
-                          style: F.syne(size: 9, weight: FontWeight.w700, color: tColor, letterSpacing: 1)),
+                      // Long type names ("Traditional Ethnic") wrapped to two
+                      // lines and burst out of the pill at phone width. In the
+                      // narrow 2-column grid the emoji is dropped as well —
+                      // those ~18px are the difference between the full label
+                      // and "Traditional Eth…".
+                      child: Text(compact ? ti['label'] : '${ti['icon']} ${ti['label']}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: F.syne(size: 10, weight: FontWeight.w700, color: tColor, letterSpacing: .8)),
                     ),
                     const SizedBox(height: 4),
                     Text(item['headline'] ?? '',
@@ -276,6 +395,9 @@ class _LightboxState extends State<_Lightbox> {
     final ti = _typeInfo(item['type']);
     final tColor = Color(ti['color'] as int);
     final wide = screenW(context) > 1024;
+    // A single-item gallery has nothing to page to, so the arrows are dropped
+    // and the photo reclaims that horizontal space.
+    final multiple = widget.items.length > 1;
 
     return Material(
       color: Colors.transparent,
@@ -305,9 +427,19 @@ class _LightboxState extends State<_Lightbox> {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      portfolioCoverImage(item, emojiSize: 120),
-                      Positioned(left: 16, child: _Arrow(label: '‹', onTap: _prev)),
-                      Positioned(right: 16, child: _Arrow(label: '›', onTap: _next)),
+                      // Inset so the whole photo stays clear of the arrows and
+                      // the screen edges — `contain` guarantees nothing is cropped.
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: multiple ? 72 : 20,
+                          vertical: 20,
+                        ),
+                        child: portfolioCoverImage(item, emojiSize: 120, fit: BoxFit.contain),
+                      ),
+                      if (multiple) ...[
+                        Positioned(left: 16, child: _Arrow(label: '‹', onTap: _prev)),
+                        Positioned(right: 16, child: _Arrow(label: '›', onTap: _next)),
+                      ],
                     ],
                   ),
                 ),
@@ -351,6 +483,35 @@ class _LightboxState extends State<_Lightbox> {
               ],
             ),
           ),
+          // Below 1024px the side panel is dropped, which left the shot with no
+          // caption at all. Show it under the photo instead so phone users
+          // still get the headline and description.
+          if (!wide)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: Color(0x12FFFFFF))),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if ((item['headline'] ?? '').toString().isNotEmpty)
+                    Text(item['headline'],
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: F.fraunces(size: 16, weight: FontWeight.w700, color: T.cream, height: 1.25)),
+                  if ((item['desc'] ?? '').toString().isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    Text(item['desc'],
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: F.syne(size: 12, weight: FontWeight.w400, color: T.mut, height: 1.6)),
+                  ],
+                ],
+              ),
+            ),
           // Dots
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -366,7 +527,7 @@ class _LightboxState extends State<_Lightbox> {
                       width: di == _i ? 18 : 5,
                       height: 5,
                       decoration: BoxDecoration(
-                        color: di == _i ? widget.accent : Colors.white.withOpacity(.2),
+                        color: di == _i ? widget.accent : Colors.white.withValues(alpha: .2),
                         borderRadius: BorderRadius.circular(3),
                       ),
                     ),
@@ -392,9 +553,9 @@ class _RoundBtn extends StatelessWidget {
           height: 34,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: h ? T.gold : Colors.white.withOpacity(.15)),
+            border: Border.all(color: h ? T.gold : Colors.white.withValues(alpha: .15)),
           ),
-          child: Center(child: Text(label, style: TextStyle(fontSize: 18, color: h ? T.gold : Colors.white.withOpacity(.7)))),
+          child: Center(child: Text(label, style: TextStyle(fontSize: 18, color: h ? T.gold : Colors.white.withValues(alpha: .7)))),
         ),
       );
 }
@@ -412,9 +573,9 @@ class _Arrow extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: const Color(0x99000000),
-            border: Border.all(color: h ? T.gold : Colors.white.withOpacity(.15)),
+            border: Border.all(color: h ? T.gold : Colors.white.withValues(alpha: .15)),
           ),
-          child: Center(child: Text(label, style: TextStyle(fontSize: 20, color: h ? T.gold : Colors.white.withOpacity(.7)))),
+          child: Center(child: Text(label, style: TextStyle(fontSize: 20, color: h ? T.gold : Colors.white.withValues(alpha: .7)))),
         ),
       );
 }

@@ -1,38 +1,149 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
     href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
+    Replaced by the value of the `--base-href` argument to `flutter build`.
   -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="AOneGo9 — Modeling Agency & Production House. Browse verified talent, venues, photographers, videographers & event services.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#09090B">
+  <meta name="description" content="AOneGo9 — Modeling Agency & Production House. Browse verified models, venues, photographers, videographers and event services across India.">
+
+  <!-- Social preview -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="AOneGo9">
+  <meta property="og:title" content="AOneGo9 — Modeling Agency & Production House">
+  <meta property="og:description" content="Browse verified models, venues, photographers, videographers and event services across India. Full portfolios and pricing before you reach out.">
+  <meta property="og:image" content="icons/Icon-512.png">
+  <meta name="twitter:card" content="summary_large_image">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="aonego9_user">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="AOneGo9">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
-  <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>aonego9_user</title>
+  <title>AOneGo9 — Modeling Agency &amp; Production House</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #09090B;
+      /* Matches the app's own background so there is no white flash on load. */
+    }
+
+    /* ── Branded boot splash ──────────────────────────────────────────
+       Flutter web ships a ~2MB bundle; without this the user stares at an
+       empty page while it downloads. Removed as soon as Flutter mounts. */
+    #boot {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 26px;
+      background: #09090B;
+      z-index: 9999;
+      transition: opacity .45s ease;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+    #boot.done { opacity: 0; pointer-events: none; }
+
+    #boot .mark {
+      font-size: 40px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+    #boot .mark .a  { color: #FFC400; }
+    #boot .mark .w  { color: #FFFFFF; }
+    #boot .mark .g  { color: #00BCE0; }
+    #boot .mark .n  { color: #FFC400; font-style: italic; }
+
+    #boot .tag {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 5px;
+      color: #FFFFFF;
+      margin-top: -14px;
+    }
+    #boot .tag em { color: #FFC400; font-style: normal; }
+
+    /* Indeterminate brand-gold sweep. */
+    #boot .bar {
+      width: 140px;
+      height: 2px;
+      background: #22222A;
+      overflow: hidden;
+      border-radius: 2px;
+    }
+    #boot .bar::after {
+      content: "";
+      display: block;
+      width: 40%;
+      height: 100%;
+      background: #C9A86C;
+      animation: sweep 1.1s ease-in-out infinite;
+    }
+    @keyframes sweep {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #boot .bar::after { animation: none; width: 100%; opacity: .5; }
+      #boot { transition: none; }
+    }
+  </style>
 </head>
 <body>
+  <div id="boot">
+    <div>
+      <div class="mark">
+        <span class="a">A</span><span class="w">o</span><span class="a">n</span><span
+        class="w">e</span><span class="g">G</span><span class="w">o</span><span class="n">9</span>
+      </div>
+      <div class="tag">MOD<em>E</em>LING AG<em>E</em>NCY</div>
+    </div>
+    <div class="bar"></div>
+  </div>
+
+  <script>
+    // Tear the splash down as soon as Flutter paints its first frame. The
+    // observer covers every renderer (flutter-view / flt-glass-pane), and the
+    // timeout is a backstop so a slow or failed boot can never trap the user
+    // behind an opaque overlay.
+    (function () {
+      var boot = document.getElementById('boot');
+      if (!boot) return;
+      var removed = false;
+      function dismiss() {
+        if (removed) return;
+        removed = true;
+        boot.classList.add('done');
+        setTimeout(function () { boot.remove(); }, 500);
+      }
+      var observer = new MutationObserver(function () {
+        if (document.querySelector('flutter-view, flt-glass-pane')) {
+          observer.disconnect();
+          dismiss();
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      setTimeout(function () { observer.disconnect(); dismiss(); }, 12000);
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

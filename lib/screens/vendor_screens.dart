@@ -51,8 +51,8 @@ class VendorPortalScreen extends StatelessWidget {
                         width: 72,
                         height: 72,
                         decoration: BoxDecoration(
-                          color: T.gold.withOpacity(.12),
-                          border: Border.all(color: T.gold.withOpacity(.25)),
+                          color: T.gold.withValues(alpha: .12),
+                          border: Border.all(color: T.gold.withValues(alpha: .25)),
                           borderRadius: BorderRadius.circular(18),
                         ),
                         alignment: Alignment.center,
