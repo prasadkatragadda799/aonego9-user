@@ -98,6 +98,12 @@ class UserRepository {
       final headline = j['headline'] as String? ?? '';
       final desc = j['description'] as String? ?? '';
       final emoji = j['emoji'] as String? ?? '🖼️';
+      final imageUrl = j['image_url'] as String? ?? '';
+      final images = (j['images'] as List?)
+              ?.map((e) => e.toString().trim())
+              .where((s) => s.isNotEmpty)
+              .toList() ??
+          (imageUrl.isNotEmpty ? [imageUrl] : <String>[]);
       return {
         'label': tag,
         'sub': headline,
@@ -107,7 +113,8 @@ class UserRepository {
         'headline': headline,
         'desc': desc,
         'emoji': emoji,
-        'imageUrl': j['image_url'] as String? ?? '',
+        'imageUrl': images.isNotEmpty ? images.first : imageUrl,
+        'images': images,
       };
     }).toList();
   }

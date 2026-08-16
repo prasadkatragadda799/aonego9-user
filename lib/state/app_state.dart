@@ -243,6 +243,10 @@ class AppState extends ChangeNotifier {
     final rating = (v['rating'] as num?)?.toDouble() ?? 0.0;
     final bookings = (v['total_bookings'] as num?)?.toInt() ?? 0;
     final avatarUrl = (v['avatar_url'] as String?)?.trim() ?? '';
+    final galleryUrls = ((v['gallery_urls'] as List?) ?? [])
+        .map((e) => e.toString().trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
 
     final profile = <String, dynamic>{
       'id': v['id'] ?? '',
@@ -257,6 +261,7 @@ class AppState extends ChangeNotifier {
       'tagline': v['bio'] as String? ?? '',
       'overview': v['bio'] as String? ?? '',
       'avatarUrl': avatarUrl,
+      'galleryUrls': galleryUrls,
       'emoji': VendorProfileUtils.categoryEmoji(cat),
       'stats': [
         {'n': '$bookings', 'l': 'Bookings'},

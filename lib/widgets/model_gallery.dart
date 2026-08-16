@@ -6,8 +6,18 @@ import 'common.dart';
 Map<String, dynamic> _typeInfo(String t) =>
     portTypes[t] ?? {'label': t, 'color': T.gold.value, 'icon': '📸'};
 
-Widget portfolioCoverImage(Map<String, dynamic> item, {double emojiSize = 44}) {
-  final url = (item['imageUrl'] as String?) ?? (item['image_url'] as String?) ?? '';
+List<String> portfolioImageUrls(Map<String, dynamic> item) {
+  final raw = item['images'] as List?;
+  if (raw != null && raw.isNotEmpty) {
+    return raw.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList();
+  }
+  final single = (item['imageUrl'] as String?) ?? (item['image_url'] as String?) ?? '';
+  return single.trim().isNotEmpty ? [single.trim()] : const [];
+}
+
+Widget portfolioCoverImage(Map<String, dynamic> item, {double emojiSize = 44, int photoIndex = 0}) {
+  final urls = portfolioImageUrls(item);
+  final url = photoIndex < urls.length ? urls[photoIndex] : (urls.isNotEmpty ? urls.first : '');
   if (url.isNotEmpty) {
     return Image.network(
       url,
@@ -196,6 +206,16 @@ class _PortCell extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   portfolioCoverImage(item, emojiSize: 44),
+                  if (portfolioImageUrls(item).length > 1)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(color: const Color(0xCC09090B), borderRadius: BorderRadius.circular(20)),
+                        child: Text('${portfolioImageUrls(item).length}', style: F.mono(size: 10, color: Colors.white)),
+                      ),
+                    ),
                   if (h)
                     Container(
                       color: const Color(0x7309090B),
@@ -266,16 +286,42 @@ class _Lightbox extends StatefulWidget {
 
 class _LightboxState extends State<_Lightbox> {
   late int _i = widget.start;
+  int _photo = 0;
 
-  void _prev() => setState(() => _i = _i > 0 ? _i - 1 : widget.items.length - 1);
-  void _next() => setState(() => _i = _i < widget.items.length - 1 ? _i + 1 : 0);
+  Map<String, dynamic> get _item => widget.items[_i];
+  List<String> get _photos => portfolioImageUrls(_item);
+
+  void _prev() {
+    setState(() {
+      if (_photos.length > 1 && _photo > 0) {
+        _photo--;
+      } else {
+        _i = _i > 0 ? _i - 1 : widget.items.length - 1;
+        _photo = portfolioImageUrls(widget.items[_i]).length - 1;
+        if (_photo < 0) _photo = 0;
+      }
+    });
+  }
+
+  void _next() {
+    setState(() {
+      if (_photos.length > 1 && _photo < _photos.length - 1) {
+        _photo++;
+      } else {
+        _i = _i < widget.items.length - 1 ? _i + 1 : 0;
+        _photo = 0;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final item = widget.items[_i];
+    final item = _item;
     final ti = _typeInfo(item['type']);
     final tColor = Color(ti['color'] as int);
     final wide = screenW(context) > 1024;
+    final photos = _photos;
+    final photoLabel = photos.length > 1 ? '${_photo + 1}/${photos.length}' : '';
 
     return Material(
       color: Colors.transparent,
@@ -291,7 +337,7 @@ class _LightboxState extends State<_Lightbox> {
                 Text('${ti['icon']} ${ti['label']}',
                     style: F.syne(size: 10, weight: FontWeight.w700, color: tColor, letterSpacing: 2)),
                 const Spacer(),
-                Text('${_i + 1} / ${widget.items.length}', style: F.mono(size: 11, color: T.dim)),
+                Text('${_i + 1} / ${widget.items.length}${photoLabel.isNotEmpty ? ' · $photoLabel' : ''}', style: F.mono(size: 11, color: T.dim)),
                 const SizedBox(width: 12),
                 _RoundBtn(label: '✕', onTap: () => Navigator.of(context).pop()),
               ],
@@ -305,7 +351,7 @@ class _LightboxState extends State<_Lightbox> {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      portfolioCoverImage(item, emojiSize: 120),
+                      portfolioCoverImage(item, emojiSize: 120, photoIndex: _photo),
                       Positioned(left: 16, child: _Arrow(label: '‹', onTap: _prev)),
                       Positioned(right: 16, child: _Arrow(label: '›', onTap: _next)),
                     ],

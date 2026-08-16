@@ -511,6 +511,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     switch (_tab) {
       case 'Gallery':
         return Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _profilePhotoGallery(),
           const BlkHeader('Portfolio Gallery'),
           if (_apiPortfolio == null)
             const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
@@ -676,6 +677,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _profilePhotoGallery() {
+    final gallery = (p['galleryUrls'] as List?)?.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList() ?? const <String>[];
+    if (gallery.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const BlkHeader('Profile Photos'),
+      SizedBox(
+        height: 112,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: gallery.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 10),
+          itemBuilder: (_, i) => ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.network(
+              gallery[i],
+              width: 112,
+              height: 112,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 112,
+                height: 112,
+                color: T.card,
+                alignment: Alignment.center,
+                child: Text(p['emoji'] ?? '', style: const TextStyle(fontSize: 28)),
+              ),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 18),
+    ]);
+  }
+
   Widget _profileAvatar({required double size, double emojiSize = 80}) {
     final url = (p['avatarUrl'] as String?)?.trim() ?? '';
     if (url.isNotEmpty) {
@@ -708,6 +742,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     final cols = screenW(context) <= 480 ? 1 : (screenW(context) <= 768 ? 2 : 3);
     return Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _profilePhotoGallery(),
       const BlkHeader('Portfolio Gallery'),
       LayoutBuilder(builder: (context, bc) {
         const gap = 10.0;
