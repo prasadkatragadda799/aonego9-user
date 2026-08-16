@@ -70,8 +70,8 @@ class _LeadFormState extends State<LeadForm> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: T.grn.withOpacity(.08),
-          border: Border.all(color: T.grn.withOpacity(.3)),
+          color: T.grn.withValues(alpha: .08),
+          border: Border.all(color: T.grn.withValues(alpha: .3)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -163,8 +163,8 @@ class _LeadFormState extends State<LeadForm> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
-                color: T.gold.withOpacity(.07),
-                border: Border.all(color: T.gold.withOpacity(.15)),
+                color: T.gold.withValues(alpha: .07),
+                border: Border.all(color: T.gold.withValues(alpha: .15)),
                 borderRadius: BorderRadius.circular(5),
               ),
               child: Text(_ref, style: F.mono(size: 11, color: T.gold)),
@@ -190,11 +190,11 @@ class _LeadFormState extends State<LeadForm> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
-                color: T.red.withOpacity(.08),
-                border: Border.all(color: T.red.withOpacity(.3)),
+                color: T.red.withValues(alpha: .08),
+                border: Border.all(color: T.red.withValues(alpha: .3)),
                 borderRadius: BorderRadius.circular(7),
               ),
-              child: Text(_error, style: F.syne(size: 12, color: T.red)),
+              child: Text(_error, style: F.syne(size: 12, color: T.redText)),
             ),
           ],
           Row(children: [
@@ -208,7 +208,7 @@ class _LeadFormState extends State<LeadForm> {
           Row(children: [
             Expanded(child: Field('Preferred Date', Fi('dd / mm / yyyy', controller: _date))),
             const SizedBox(width: 9),
-            Expanded(child: Field('Location', const Fi('City...'))),
+            const Expanded(child: Field('Location', Fi('City...'))),
           ]),
           const SizedBox(height: 11),
           Field('Inquiry Type', FiSelect(options: inqOptions, onChanged: (v) => _inqType = v ?? inqOptions.first)),
@@ -224,8 +224,8 @@ class _LeadFormState extends State<LeadForm> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
               decoration: BoxDecoration(
-                color: T.red.withOpacity(.05),
-                border: Border.all(color: T.red.withOpacity(_urg ? .28 : .12)),
+                color: T.red.withValues(alpha: .05),
+                border: Border.all(color: T.red.withValues(alpha: _urg ? .28 : .12)),
                 borderRadius: BorderRadius.circular(7),
               ),
               child: Row(children: [
@@ -237,7 +237,7 @@ class _LeadFormState extends State<LeadForm> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text('🚨 Mark as Urgent',
-                          style: F.syne(size: 12, weight: FontWeight.w600, color: _urg ? T.red : T.mut)),
+                          style: F.syne(size: 12, weight: FontWeight.w600, color: _urg ? T.redText : T.mut)),
                       const SizedBox(height: 1),
                       Text('Admin + vendor notified immediately',
                           style: F.syne(size: 10, weight: FontWeight.w400, color: T.dim)),
@@ -296,7 +296,7 @@ class _SubmitButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 13),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: loading ? accent.withOpacity(0.6) : accent,
+          color: loading ? accent.withValues(alpha: 0.6) : accent,
           borderRadius: BorderRadius.circular(8),
         ),
         child: loading

@@ -57,7 +57,7 @@ class _AccountScreenState extends State<AccountScreen> {
           child: Row(children: [
             _Btn(label: '← Back to Browse', onTap: app.backToBrowse),
             const SizedBox(width: 12),
-            const Expanded(child: Text('My Account', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: T.text))),
+            Expanded(child: Text('My Account', style: F.syne(size: 13, weight: FontWeight.w700, color: T.text))),
             _Btn(label: 'Log Out', onTap: app.logoutUser),
           ]),
         ),
@@ -164,7 +164,7 @@ class _AccountScreenState extends State<AccountScreen> {
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text('₹${amount.toStringAsFixed(0)}', style: F.fraunces(size: 15, weight: FontWeight.w700, color: T.gold)),
           const SizedBox(height: 3),
-          Text('${b['status'] ?? ''}'.toUpperCase(), style: F.syne(size: 9, weight: FontWeight.w700, color: T.mut, letterSpacing: 1)),
+          Text('${b['status'] ?? ''}'.toUpperCase(), style: F.syne(size: 10, weight: FontWeight.w700, color: T.mut, letterSpacing: 1)),
         ]),
       ]),
     );

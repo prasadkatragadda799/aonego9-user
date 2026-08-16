@@ -83,7 +83,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           child: Row(children: [
             _Btn(label: '← Back to Account', onTap: () => app.setView('account')),
             const SizedBox(width: 12),
-            const Expanded(child: Text('Subscription', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: T.text))),
+            Expanded(child: Text('Subscription', style: F.syne(size: 13, weight: FontWeight.w700, color: T.text))),
           ]),
         ),
         Expanded(
@@ -150,8 +150,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: T.gold.withOpacity(0.08),
-        border: Border.all(color: T.gold.withOpacity(0.4)),
+        color: T.gold.withValues(alpha: 0.08),
+        border: Border.all(color: T.gold.withValues(alpha: 0.4)),
         borderRadius: BorderRadius.circular(9),
       ),
       child: Row(children: [
@@ -220,8 +220,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           if (recommended)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: T.gold.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
-              child: Text('RECOMMENDED', style: F.syne(size: 9, weight: FontWeight.w700, color: T.gold, letterSpacing: 1)),
+              decoration: BoxDecoration(color: T.gold.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
+              child: Text('RECOMMENDED', style: F.syne(size: 10, weight: FontWeight.w700, color: T.gold, letterSpacing: 1)),
             ),
         ]),
         const SizedBox(height: 6),

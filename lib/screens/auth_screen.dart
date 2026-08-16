@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
 import '../state/app_state.dart';
+import '../widgets/brand.dart';
 import '../widgets/common.dart';
 import '../widgets/form_fields.dart';
 
@@ -49,19 +50,55 @@ class _PubButton extends StatelessWidget {
   final VoidCallback? onTap;
   const _PubButton({required this.label, required this.onTap});
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget build(BuildContext context) {
+    final disabled = onTap == null;
+    // A dimmed-gold fill put near-black label text at 2.6:1 — unreadable while
+    // the request was in flight. Disabled now reads as an outlined surface with
+    // a light label (7.4:1) plus a spinner, so the busy state is legible.
+    return MouseRegion(
+      cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      child: GestureDetector(
         onTap: onTap,
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 14),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: onTap == null ? T.gold.withOpacity(.4) : T.gold,
+            color: disabled ? T.surf : T.gold,
+            border: disabled ? Border.all(color: T.bdhi) : null,
             borderRadius: BorderRadius.circular(9),
           ),
-          child: Text(label, style: F.syne(size: 15, weight: FontWeight.w700, color: T.bg)),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (disabled) ...[
+                const SizedBox(
+                  height: 14,
+                  width: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: T.gold),
+                ),
+                const SizedBox(width: 10),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: F.syne(
+                    size: 15,
+                    weight: FontWeight.w700,
+                    color: disabled ? T.mut : T.bg,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 /// ── CUSTOMER AUTH — sign in / create account, wired to the real backend ──
@@ -121,8 +158,8 @@ class _UserAuthState extends State<UserAuth> {
                         padding: const EdgeInsets.fromLTRB(28, 28, 28, 20),
                         decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: T.bdr))),
                         child: Column(children: [
-                          Text(_register ? '✨' : '🔐', style: const TextStyle(fontSize: 40)),
-                          const SizedBox(height: 12),
+                          const BrandLogo(size: 30, variant: LogoVariant.full),
+                          const SizedBox(height: 20),
                           Text(_register ? 'Create Your Account' : 'Welcome Back', style: F.fraunces(size: 26, weight: FontWeight.w700, color: T.cream)),
                           const SizedBox(height: 5),
                           Text(
@@ -150,7 +187,7 @@ class _UserAuthState extends State<UserAuth> {
                           Field('Password', Fi('••••••••', obscure: true, controller: _password)),
                           if (app.authError != null) ...[
                             const SizedBox(height: 12),
-                            Text(app.authError!, style: F.syne(size: 12, weight: FontWeight.w600, color: T.red)),
+                            Text(app.authError!, style: F.syne(size: 12, weight: FontWeight.w600, color: T.redText)),
                           ],
                           const SizedBox(height: 15),
                           _PubButton(

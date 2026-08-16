@@ -132,7 +132,7 @@ class AppState extends ChangeNotifier {
   /// list is a genuine "nothing here yet" — never backfilled with fake data.
   List<Map<String, dynamic>>? _apiListings;
   List<Map<String, dynamic>>? _apiTickerEvents;
-  Map<String, List<String>> _apiFilters = {};
+  final Map<String, List<String>> _apiFilters = {};
   bool listingsLoading = false;
 
   static const _defaultFilters = <String, List<String>>{
@@ -232,11 +232,17 @@ class AppState extends ChangeNotifier {
     // Map backend category string → user app cat id
     final rawCat = (v['category'] as String? ?? '').toLowerCase();
     String cat = 'modelF';
-    if (rawCat.contains('photo')) cat = 'photo';
-    else if (rawCat.contains('video')) cat = 'video';
-    else if (rawCat.contains('venue')) cat = 'venue';
-    else if (rawCat.contains('event')) cat = 'events';
-    else if (rawCat.contains('male')) cat = 'modelM';
+    if (rawCat.contains('photo')) {
+      cat = 'photo';
+    } else if (rawCat.contains('video')) {
+      cat = 'video';
+    } else if (rawCat.contains('venue')) {
+      cat = 'venue';
+    } else if (rawCat.contains('event')) {
+      cat = 'events';
+    } else if (rawCat.contains('male')) {
+      cat = 'modelM';
+    }
 
     final name = v['name'] as String? ?? v['company'] as String? ?? '';
     final city = v['city'] as String? ?? '';

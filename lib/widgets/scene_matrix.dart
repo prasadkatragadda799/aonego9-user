@@ -50,8 +50,8 @@ class SceneMatrix extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: T.gold.withOpacity(.04),
-            border: Border.all(color: T.gold.withOpacity(.1)),
+            color: T.gold.withValues(alpha: .04),
+            border: Border.all(color: T.gold.withValues(alpha: .1)),
             borderRadius: BorderRadius.circular(9),
           ),
           child: Text(
@@ -74,8 +74,8 @@ class SceneMatrix extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
           decoration: BoxDecoration(
-            color: T.gold.withOpacity(.04),
-            border: Border.all(color: T.gold.withOpacity(.12)),
+            color: T.gold.withValues(alpha: .04),
+            border: Border.all(color: T.gold.withValues(alpha: .12)),
             borderRadius: BorderRadius.circular(9),
           ),
           child: Text.rich(
@@ -146,16 +146,16 @@ class _SceneCard extends StatelessWidget {
     double opacity = 1;
     switch (status) {
       case 'verified':
-        border = T.gold.withOpacity(.25);
-        bg = T.gold.withOpacity(.04);
-        iconBg = T.gold.withOpacity(.15);
+        border = T.gold.withValues(alpha: .25);
+        bg = T.gold.withValues(alpha: .04);
+        iconBg = T.gold.withValues(alpha: .15);
         reqColor = T.gold;
         break;
       case 'restricted':
-        border = T.red.withOpacity(.2);
-        bg = T.red.withOpacity(.04);
-        iconBg = T.red.withOpacity(.12);
-        reqColor = T.red;
+        border = T.red.withValues(alpha: .2);
+        bg = T.red.withValues(alpha: .04);
+        iconBg = T.red.withValues(alpha: .12);
+        reqColor = T.redText;
         break;
       case 'no':
         border = T.bdr;
@@ -164,9 +164,9 @@ class _SceneCard extends StatelessWidget {
         opacity = .38;
         break;
       default: // avail
-        border = T.grn.withOpacity(.22);
-        bg = T.grn.withOpacity(.03);
-        iconBg = T.grn.withOpacity(.18);
+        border = T.grn.withValues(alpha: .22);
+        bg = T.grn.withValues(alpha: .03);
+        iconBg = T.grn.withValues(alpha: .18);
     }
 
     final reqs = (s['reqs'] as List?)?.cast<String>() ?? const [];
@@ -235,15 +235,15 @@ class _Badge extends StatelessWidget {
   const _Badge({required this.text, required this.v2});
   @override
   Widget build(BuildContext context) {
-    final c = v2 ? T.red : T.gold;
+    final c = v2 ? T.redText : T.gold;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: c.withOpacity(v2 ? .1 : .12),
-        border: Border.all(color: c.withOpacity(v2 ? .22 : .25)),
+        color: c.withValues(alpha: v2 ? .1 : .12),
+        border: Border.all(color: c.withValues(alpha: v2 ? .22 : .25)),
         borderRadius: BorderRadius.circular(3),
       ),
-      child: Text(text, style: F.syne(size: 8, weight: FontWeight.w700, color: c, letterSpacing: .8)),
+      child: Text(text, style: F.syne(size: 10, weight: FontWeight.w700, color: c, letterSpacing: .8)),
     );
   }
 }

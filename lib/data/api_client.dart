@@ -107,7 +107,7 @@ class ApiClient {
   }) async {
     if ((await getAccessToken())?.isEmpty ?? true) {
       if (!await _refreshAccessToken()) {
-        throw ApiException(401, 'Not logged in — sign in again to upload photos');
+        throw const ApiException(401, 'Not logged in — sign in again to upload photos');
       }
     }
 

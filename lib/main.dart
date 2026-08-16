@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'theme/tokens.dart';
@@ -22,15 +23,63 @@ class AOneGo9App extends StatelessWidget {
       child: MaterialApp(
         title: 'AOneGo9 — Modeling Agency & Production House',
         debugShowCheckedModeBanner: false,
+        scrollBehavior: const _AppScrollBehavior(),
         theme: ThemeData(
           scaffoldBackgroundColor: T.bg,
-          colorScheme: const ColorScheme.dark(surface: T.bg, primary: T.gold),
+          colorScheme: const ColorScheme.dark(
+            surface: T.bg,
+            primary: T.gold,
+            onPrimary: T.bg,
+            secondary: T.gold,
+            error: T.redText,
+          ),
           useMaterial3: true,
+          // Spinners inherit the brand instead of Material's default blue.
+          progressIndicatorTheme: const ProgressIndicatorThemeData(color: T.gold),
+          textSelectionTheme: TextSelectionThemeData(
+            cursorColor: T.gold,
+            selectionColor: T.gold.withValues(alpha: .28),
+            selectionHandleColor: T.gold,
+          ),
+          tooltipTheme: TooltipThemeData(
+            decoration: BoxDecoration(
+              color: T.card,
+              border: Border.all(color: T.bdr),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            textStyle: F.syne(size: 11, weight: FontWeight.w600, color: T.text),
+            waitDuration: const Duration(milliseconds: 400),
+          ),
+          dividerTheme: const DividerThemeData(color: T.bdr, thickness: 1, space: 1),
+          // Flutter web's default scrollbar is a light overlay — invisible here.
+          scrollbarTheme: ScrollbarThemeData(
+            thumbColor: WidgetStateProperty.resolveWith(
+              (s) => s.contains(WidgetState.hovered) ? T.bdhi : T.bdr,
+            ),
+            thickness: const WidgetStatePropertyAll(8),
+            radius: const Radius.circular(4),
+            crossAxisMargin: 2,
+          ),
         ),
         home: const _Root(),
       ),
     );
   }
+}
+
+/// On desktop web the category rail and profile tabs are horizontal scrollers.
+/// Flutter only accepts touch drags by default, so a mouse user could see the
+/// overflow but not reach it. This enables mouse/trackpad dragging everywhere.
+class _AppScrollBehavior extends MaterialScrollBehavior {
+  const _AppScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => const {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
 }
 
 class _Root extends StatelessWidget {
