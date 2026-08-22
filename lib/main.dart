@@ -9,6 +9,12 @@ import 'screens/vendor_screens.dart';
 import 'screens/auth_screen.dart';
 import 'screens/account_screen.dart';
 import 'screens/subscription_screen.dart';
+import 'screens/newsletter_screen.dart';
+import 'screens/events_screen.dart';
+import 'screens/about_screen.dart';
+import 'screens/partners_screen.dart';
+import 'widgets/app_drawer.dart';
+import 'widgets/newsletter_popup.dart';
 import 'widgets/toast.dart';
 
 void main() => runApp(const AOneGo9App());
@@ -51,6 +57,12 @@ class AOneGo9App extends StatelessWidget {
             waitDuration: const Duration(milliseconds: 400),
           ),
           dividerTheme: const DividerThemeData(color: T.bdr, thickness: 1, space: 1),
+          drawerTheme: const DrawerThemeData(
+            backgroundColor: T.surf,
+            scrimColor: Color(0xCC050506),
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+          ),
           // Flutter web's default scrollbar is a light overlay — invisible here.
           scrollbarTheme: ScrollbarThemeData(
             thumbColor: WidgetStateProperty.resolveWith(
@@ -116,15 +128,30 @@ class _Root extends StatelessWidget {
       case 'subscription':
         body = app.isLoggedIn ? const SubscriptionScreen() : const UserAuth();
         break;
+      case 'newsletter':
+        body = const NewsletterScreen();
+        break;
+      case 'events':
+        body = const EventsScreen();
+        break;
+      case 'about':
+        body = const AboutScreen();
+        break;
+      case 'partners':
+        body = const PartnersScreen();
+        break;
       default:
         body = const BrowseScreen();
     }
 
     return Scaffold(
       backgroundColor: T.bg,
+      drawer: const AppDrawer(),
+      drawerEnableOpenDragGesture: true,
       body: Stack(
         children: [
           Positioned.fill(child: body),
+          if (app.showNewsletterPopup && app.view == 'browse') const NewsletterPopup(),
           if (app.toast != null) ToastView(msg: app.toast!, accent: toastAccent),
         ],
       ),

@@ -96,6 +96,15 @@ class SiteFooter extends StatelessWidget {
                     ),
                     // ── Account ──
                     _Col(
+                      title: 'Discover',
+                      children: [
+                        _Link(label: 'Newsletter', accent: T.gold, onTap: () => app.setView('newsletter')),
+                        _Link(label: 'Events', accent: T.gold, onTap: () => app.setView('events')),
+                        _Link(label: 'About', accent: T.gold, onTap: () => app.setView('about')),
+                        _Link(label: 'Partnered with', accent: T.gold, onTap: () => app.setView('partners')),
+                      ],
+                    ),
+                    _Col(
                       title: 'Account',
                       children: [
                         _Link(

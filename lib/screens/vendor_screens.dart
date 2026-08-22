@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
 import '../state/app_state.dart';
+import '../widgets/chrome.dart';
 import '../widgets/common.dart';
 
 /// Redirect screen — vendors manage their business in the dedicated vendor app,
@@ -23,6 +24,8 @@ class VendorPortalScreen extends StatelessWidget {
               border: Border(bottom: BorderSide(color: T.bdr)),
             ),
             child: Row(children: [
+              const MenuBtn(),
+              const SizedBox(width: 10),
               HoverFx(
                 onTap: () => context.read<AppState>().setView('browse'),
                 builder: (h) => Container(

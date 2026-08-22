@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
 import '../data/user_repository.dart';
 import '../state/app_state.dart';
+import '../widgets/chrome.dart';
 import '../widgets/common.dart';
 
 /// ── ACCOUNT — logged-in customer's profile + booking history ──
@@ -51,15 +52,24 @@ class _AccountScreenState extends State<AccountScreen> {
       color: T.bg,
       child: Column(children: [
         Container(
-          height: 56,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          height: 58,
           decoration: const BoxDecoration(color: Color(0xF709090B), border: Border(bottom: BorderSide(color: T.bdr))),
-          child: Row(children: [
-            _Btn(label: '← Back to Browse', onTap: app.backToBrowse),
-            const SizedBox(width: 12),
-            Expanded(child: Text('My Account', style: F.syne(size: 13, weight: FontWeight.w700, color: T.text))),
-            _Btn(label: 'Log Out', onTap: app.logoutUser),
-          ]),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1280),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(children: [
+                  const MenuBtn(),
+                  const SizedBox(width: 10),
+                  _Btn(label: isNarrow(context) ? '← Browse' : '← Back to Browse', onTap: app.backToBrowse),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text('My Account', style: F.syne(size: 13, weight: FontWeight.w700, color: T.text))),
+                  _Btn(label: 'Log Out', onTap: app.logoutUser),
+                ]),
+              ),
+            ),
+          ),
         ),
         Expanded(
           child: SingleChildScrollView(

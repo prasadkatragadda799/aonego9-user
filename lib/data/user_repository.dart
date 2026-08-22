@@ -244,8 +244,51 @@ class UserRepository {
 
   // GET /api/v1/events — live and upcoming events for the user app
   Future<List<Map<String, dynamic>>> events() async {
-    final data = await ApiClient.get('/events') as List;
-    return data.cast<Map<String, dynamic>>();
+    final data = await ApiClient.get('/events');
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    if (data is Map && data['items'] is List) {
+      return (data['items'] as List).cast<Map<String, dynamic>>();
+    }
+    return const [];
+  }
+
+  // GET /api/v1/cms/newsletters — published digest (empty if the desk hasn't shipped this yet)
+  Future<List<Map<String, dynamic>>> newsletters() async {
+    try {
+      final data = await ApiClient.get('/cms/newsletters');
+      if (data is List) return data.cast<Map<String, dynamic>>();
+      if (data is Map && data['items'] is List) {
+        return (data['items'] as List).cast<Map<String, dynamic>>();
+      }
+    } catch (_) {}
+    try {
+      final data = await ApiClient.get('/browse/newsletters');
+      if (data is List) return data.cast<Map<String, dynamic>>();
+      if (data is Map && data['items'] is List) {
+        return (data['items'] as List).cast<Map<String, dynamic>>();
+      }
+    } catch (_) {}
+    return const [];
+  }
+
+  // POST /api/v1/browse/newsletter/subscribe — capture name, email, phone, city
+  Future<void> subscribeNewsletter({
+    required String name,
+    required String email,
+    String phone = '',
+    String city = '',
+  }) async {
+    await ApiClient.post('/browse/newsletter/subscribe', {
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'city': city,
+    }, auth: false);
+  }
+
+  // POST /api/v1/browse/newsletter/contribute — press/vendor story with credentials
+  Future<void> contributeNewsletter(Map<String, dynamic> payload) async {
+    await ApiClient.post('/browse/newsletter/contribute', payload, auth: false);
   }
 
   // ── User profile ──────────────────────────────────────────────

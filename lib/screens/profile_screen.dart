@@ -7,6 +7,7 @@ import '../data/user_repository.dart';
 import '../data/vendor_profile_utils.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
+import '../widgets/chrome.dart';
 import '../widgets/lead_form.dart';
 import '../widgets/model_gallery.dart';
 import '../widgets/scene_matrix.dart';
@@ -269,15 +270,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Row(
         children: [
-          _PnavBtn(label: '← Back', onTap: app.backToBrowse, back: true),
+          const MenuBtn(),
+          const SizedBox(width: 10),
+          _PnavBtn(label: isNarrow(context) ? '←' : '← Back', onTap: app.backToBrowse, back: true),
           const SizedBox(width: 12),
           Expanded(
             child: Text(p['name'] ?? '',
                 maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: F.syne(size: 13, weight: FontWeight.w700, color: T.text)),
           ),
-          _PnavBtn(label: '🔗 Copy', onTap: () => _copyLink(app)),
-          const SizedBox(width: 6),
+          if (!isNarrow(context)) ...[
+            _PnavBtn(label: '🔗 Copy', onTap: () => _copyLink(app)),
+            const SizedBox(width: 6),
+          ],
           _PnavBtn(label: 'Share', onTap: () => _share(app, 'Profile')),
         ],
       ),

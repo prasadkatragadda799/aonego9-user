@@ -10,6 +10,7 @@ import '../data/upload_service.dart';
 import '../data/user_repository.dart';
 import '../state/app_state.dart';
 import '../theme/tokens.dart';
+import '../widgets/chrome.dart';
 import '../widgets/common.dart';
 
 /// ── SUBSCRIPTION — plan grid, UPI-QR + receipt upload, admin-approval flow ──
@@ -81,6 +82,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: const BoxDecoration(color: Color(0xF709090B), border: Border(bottom: BorderSide(color: T.bdr))),
           child: Row(children: [
+            const MenuBtn(),
+            const SizedBox(width: 10),
             _Btn(label: '← Back to Account', onTap: () => app.setView('account')),
             const SizedBox(width: 12),
             Expanded(child: Text('Subscription', style: F.syne(size: 13, weight: FontWeight.w700, color: T.text))),

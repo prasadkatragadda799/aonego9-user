@@ -148,57 +148,72 @@ class ListingCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (availIn != null) ...[
-                    Builder(builder: (_) {
-                      final loc = (item['loc'] ?? '').toString().toLowerCase();
-                      final panIndia = loc.contains('pan india') || loc.contains('all india');
-                      return Row(children: [
-                        Container(width: 6, height: 6, decoration: const BoxDecoration(color: T.grn, shape: BoxShape.circle)),
-                        const SizedBox(width: 6),
-                        Text(panIndia ? 'Serves all India' : 'Available in $availIn',
-                            style: F.syne(size: 10.5, weight: FontWeight.w600, color: T.grn)),
-                      ]);
-                    }),
-                    const SizedBox(height: 9),
-                  ],
-                  Text(item['tagline'] ?? '',
-                      maxLines: 1,
+                  SizedBox(
+                    height: 18,
+                    child: availIn == null
+                        ? const SizedBox.shrink()
+                        : Builder(builder: (_) {
+                            final loc = (item['loc'] ?? '').toString().toLowerCase();
+                            final panIndia = loc.contains('pan india') || loc.contains('all india');
+                            return Row(children: [
+                              Container(width: 6, height: 6, decoration: const BoxDecoration(color: T.grn, shape: BoxShape.circle)),
+                              const SizedBox(width: 6),
+                              Text(panIndia ? 'Serves all India' : 'Available in $availIn',
+                                  style: F.syne(size: 10.5, weight: FontWeight.w600, color: T.grn)),
+                            ]);
+                          }),
+                  ),
+                  const SizedBox(height: 9),
+                  SizedBox(
+                    height: 34,
+                    child: Text(
+                      (item['tagline'] as String?)?.trim().isNotEmpty == true ? item['tagline'] : ' ',
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: F.syne(size: 12, weight: FontWeight.w400, color: T.dim)),
+                      style: F.syne(size: 12, weight: FontWeight.w400, color: T.dim, height: 1.4),
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Text('★' * ((item['rating'] as num?)?.floor() ?? 0),
-                              style: TextStyle(fontSize: 11, color: accent, letterSpacing: 1)),
-                          const SizedBox(width: 5),
-                          Text('${item['rating']}',
-                              style: F.fraunces(size: 14, weight: FontWeight.w700, color: accent)),
-                          const SizedBox(width: 4),
-                          Text('(${item['reviewCount']})', style: F.syne(size: 10, weight: FontWeight.w400, color: T.dim)),
-                        ],
+                      Icon(Icons.star_rounded, size: 15, color: accent),
+                      const SizedBox(width: 4),
+                      Text(
+                        ((item['rating'] as num?)?.toDouble() ?? 0).toStringAsFixed(1),
+                        style: F.fraunces(size: 14, weight: FontWeight.w700, color: accent),
                       ),
-                      _CardCta(accent: accent, onTap: onView),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text('(${item['reviewCount'] ?? 0})',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: F.syne(size: 10, weight: FontWeight.w400, color: T.dim)),
+                      ),
+                      _CardCta(accent: accent, onTap: onView, compact: screenW(context) < 400),
                     ],
                   ),
-                  if (tags.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 5,
-                      runSpacing: 5,
-                      children: [
-                        for (final t in tags)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                                color: T.surf, border: Border.all(color: T.bdr), borderRadius: BorderRadius.circular(3)),
-                            child: Text('$t', style: F.syne(size: 10, weight: FontWeight.w400, color: T.dim)),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 26,
+                    child: tags.isEmpty
+                        ? const SizedBox.shrink()
+                        : ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              for (final t in tags.take(4))
+                                Container(
+                                  margin: const EdgeInsets.only(right: 5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: T.surf,
+                                    border: Border.all(color: T.bdr),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                  child: Text('$t', style: F.syne(size: 10, weight: FontWeight.w400, color: T.dim)),
+                                ),
+                            ],
                           ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ],
               ),
             ),
@@ -230,19 +245,21 @@ class _Pill extends StatelessWidget {
 class _CardCta extends StatelessWidget {
   final Color accent;
   final VoidCallback onTap;
-  const _CardCta({required this.accent, required this.onTap});
+  final bool compact;
+  const _CardCta({required this.accent, required this.onTap, this.compact = false});
   @override
   Widget build(BuildContext context) {
     return HoverFx(
       onTap: onTap,
       builder: (h) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: 6),
         decoration: BoxDecoration(
           color: h ? accent.withValues(alpha: .07) : Colors.transparent,
           border: Border.all(color: Colors.white.withValues(alpha: .08)),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Text('View Profile →', style: F.syne(size: 12, weight: FontWeight.w700, color: accent)),
+        child: Text(compact ? 'View →' : 'View Profile →',
+            style: F.syne(size: 12, weight: FontWeight.w700, color: accent)),
       ),
     );
   }

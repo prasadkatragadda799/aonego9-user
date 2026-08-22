@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
 import '../state/app_state.dart';
 import '../widgets/brand.dart';
+import '../widgets/chrome.dart';
 import '../widgets/common.dart';
 import '../widgets/form_fields.dart';
 
@@ -22,6 +23,8 @@ class _Pnav extends StatelessWidget {
         border: Border(bottom: BorderSide(color: T.bdr)),
       ),
       child: Row(children: [
+        const MenuBtn(),
+        const SizedBox(width: 10),
         _PnavBtn(label: '← Back to Browse', onTap: onBack),
         const SizedBox(width: 12),
         Expanded(child: Text(title, style: F.syne(size: 13, weight: FontWeight.w700, color: T.text))),

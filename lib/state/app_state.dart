@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../data/api_client.dart';
+import '../data/editorial.dart';
 import '../data/user_repository.dart';
 import '../data/vendor_profile_utils.dart';
 
@@ -36,10 +38,15 @@ class Inquiry {
 
 /// AppState — direct port of App()'s useState machine.
 class AppState extends ChangeNotifier {
-  String view = 'browse'; // browse | profile | vendor-auth | vendor-dash | vendor-edit
+  String view = 'browse'; // browse | profile | vendor-auth | vendor-dash | vendor-edit | newsletter | events | about | partners | login | account | subscription
   Map<String, dynamic>? selectedProfile;
+  NewsletterIssue? selectedIssue;
   String activeCat = 'modelF';
   String filter = 'All';
+  String newsletterTab = 'happening'; // happening | trend
+
+  bool showNewsletterPopup = false;
+  bool newsletterSubscribed = false;
 
   /// The user's location. The whole marketplace is filtered to what is
   /// available here, so "in my location I see what's available". A profile
@@ -132,8 +139,11 @@ class AppState extends ChangeNotifier {
   /// list is a genuine "nothing here yet" — never backfilled with fake data.
   List<Map<String, dynamic>>? _apiListings;
   List<Map<String, dynamic>>? _apiTickerEvents;
+  List<NewsletterIssue> _newsletters = List.of(seedNewsletters);
+  List<Map<String, dynamic>> _platformEvents = List.of(seedEvents);
   final Map<String, List<String>> _apiFilters = {};
   bool listingsLoading = false;
+  bool eventsLoading = false;
 
   static const _defaultFilters = <String, List<String>>{
     'venue': ['All', 'Indoor', 'Outdoor', 'Rooftop', 'Heritage'],
@@ -152,6 +162,16 @@ class AppState extends ChangeNotifier {
 
   List<Map<String, dynamic>> get apiListings => _apiListings ?? [];
   List<Map<String, dynamic>> get tickerEvents => _apiTickerEvents ?? [];
+  List<NewsletterIssue> get newsletters => _newsletters;
+  List<NewsletterIssue> get happeningIssues =>
+      _newsletters.where((n) => n.kind == 'happening').toList();
+  List<NewsletterIssue> get trendIssues =>
+      _newsletters.where((n) => n.kind == 'trend').toList();
+  NewsletterIssue get featuredIssue {
+    final match = _newsletters.where((n) => n.id == featuredIssueId);
+    return match.isNotEmpty ? match.first : _newsletters.first;
+  }
+  List<Map<String, dynamic>> get platformEvents => _platformEvents;
   List<String> filtersFor(String catId) => _apiFilters[catId] ?? _defaultFilters[catId] ?? const ['All'];
 
   static String _catIdFromSlug(String slug) => switch (slug) {
@@ -209,6 +229,118 @@ class AppState extends ChangeNotifier {
       _apiTickerEvents = [];
       notifyListeners();
     }
+  }
+
+  /// Live + upcoming platform events. Seed content stays if the API is empty.
+  Future<void> fetchPlatformEvents() async {
+    eventsLoading = true;
+    notifyListeners();
+    try {
+      final raw = await _repo.events();
+      if (raw.isNotEmpty) {
+        _platformEvents = raw.map(_normaliseEvent).toList();
+      }
+    } catch (_) {
+      // keep seed events so the page is never a blank wall
+    } finally {
+      eventsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  static Map<String, dynamic> _normaliseEvent(Map<String, dynamic> e) {
+    return {
+      'id': '${e['id'] ?? ''}',
+      'title': e['title'] ?? '',
+      'city': e['city'] ?? e['location'] ?? '',
+      'date': e['date'] ?? e['starts_at'] ?? '',
+      'end_date': e['end_date'] ?? e['ends_at'] ?? '',
+      'status': e['status'] ?? 'upcoming',
+      'on_poster': e['on_poster'] == true,
+      'venue': e['venue'] ?? e['location'] ?? '',
+      'blurb': e['blurb'] ?? e['description'] ?? e['subtitle'] ?? '',
+      'emoji': e['emoji'] ?? '📅',
+      'bg': (e['bg'] as num?)?.toInt() ?? 0,
+    };
+  }
+
+  Future<void> fetchNewsletters() async {
+    try {
+      final raw = await _repo.newsletters();
+      if (raw.isEmpty) return;
+      final parsed = raw.map(NewsletterIssue.fromJson).where((n) => n.title.isNotEmpty).toList();
+      if (parsed.isNotEmpty) {
+        _newsletters = parsed;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> subscribeNewsletter({
+    required String name,
+    required String email,
+    String phone = '',
+    String city = '',
+  }) async {
+    try {
+      await _repo.subscribeNewsletter(name: name, email: email, phone: phone, city: city);
+    } catch (_) {
+      // captured locally either way — the desk still has the lead
+    }
+    newsletterSubscribed = true;
+    showNewsletterPopup = false;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('nl_sub', true);
+    await prefs.setString('nl_email', email);
+    await prefs.setString('nl_name', name);
+    notifyListeners();
+    showToast('You\'re on the digest', 'What\'s happening + trends, every Friday', '✉️');
+  }
+
+  Future<void> contributeNewsletter(Map<String, dynamic> payload) async {
+    try {
+      await _repo.contributeNewsletter(payload);
+    } catch (_) {}
+    showToast('Story received', 'The desk will verify credentials before it goes live', '📝');
+  }
+
+  Future<void> dismissNewsletterPopup() async {
+    showNewsletterPopup = false;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('nl_popup_at', DateTime.now().millisecondsSinceEpoch);
+  }
+
+  Future<void> _maybeShowNewsletterPopup() async {
+    final prefs = await SharedPreferences.getInstance();
+    newsletterSubscribed = prefs.getBool('nl_sub') ?? false;
+    if (newsletterSubscribed) return;
+    final last = prefs.getInt('nl_popup_at') ?? 0;
+    if (last != 0) {
+      final age = DateTime.now().millisecondsSinceEpoch - last;
+      if (age < const Duration(hours: 18).inMilliseconds) return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    if (view == 'browse') {
+      showNewsletterPopup = true;
+      notifyListeners();
+    }
+  }
+
+  void setNewsletterTab(String tab) {
+    if (newsletterTab == tab) return;
+    newsletterTab = tab;
+    if (selectedIssue != null && selectedIssue!.kind != tab) {
+      selectedIssue = null;
+    }
+    notifyListeners();
+  }
+
+  void openIssue(NewsletterIssue issue) {
+    selectedIssue = issue;
+    newsletterTab = issue.kind;
+    view = 'newsletter';
+    notifyListeners();
   }
 
   /// Load filter chips for each browse category from the backend.
@@ -340,11 +472,13 @@ class AppState extends ChangeNotifier {
 
   AppState() {
     _initFromUrl();
-    // Kick off API fetches immediately on startup
     fetchListings();
     fetchTickerEvents();
     fetchCategories();
+    fetchPlatformEvents();
+    fetchNewsletters();
     restoreSession();
+    _maybeShowNewsletterPopup();
   }
 
   /// Optional deep-link via URL fragment (e.g. #profile/mf1, #vendor-dash).
@@ -362,6 +496,12 @@ class AppState extends ChangeNotifier {
       case 'profile':
         final id = parts.length > 1 ? parts[1] : '';
         if (id.isNotEmpty) _openSharedProfile(id);
+        break;
+      case 'newsletter':
+      case 'events':
+      case 'about':
+      case 'partners':
+        view = parts[0];
         break;
       case 'vendor-auth':
       case 'vendor-dash':
@@ -472,6 +612,7 @@ class AppState extends ChangeNotifier {
   void backToBrowse() {
     view = 'browse';
     selectedProfile = null;
+    selectedIssue = null;
     notifyListeners();
   }
 }

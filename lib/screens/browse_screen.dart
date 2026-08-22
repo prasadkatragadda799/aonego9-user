@@ -8,7 +8,9 @@ import '../theme/tokens.dart';
 import '../data/app_data.dart';
 import '../state/app_state.dart';
 import '../widgets/brand.dart';
+import '../widgets/chrome.dart';
 import '../widgets/common.dart';
+import '../widgets/digest_strip.dart';
 import '../widgets/ticker.dart';
 import '../widgets/listing_card.dart';
 import '../widgets/footer.dart';
@@ -36,7 +38,13 @@ class BrowseScreen extends StatelessWidget {
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1280),
-                child: _hero(context, accent, catInfo, hero),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _hero(context, accent, catInfo, hero),
+                    const DigestStrip(),
+                  ],
+                ),
               ),
             ),
           ),
@@ -243,7 +251,8 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                // Logo — the brand mark, home affordance.
+                const MenuBtn(),
+                const SizedBox(width: 10),
                 Tooltip(
                   message: 'AOneGo9 — back to browse',
                   child: HoverFx(
@@ -256,26 +265,28 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
                   ),
                 ),
                 const SizedBox(width: 10),
-                // Location picker — the whole marketplace filters to this city.
                 _LocationChip(app: app, compact: narrow),
                 const SizedBox(width: 8),
                 const Spacer(),
-                const SizedBox(width: 8),
-                // Right
                 if (showVendorBtn) ...[
-                  _GhostBtn(label: 'Vendor Portal', onTap: () => app.setView('vendor-auth')),
+                  GhostBtn(label: 'Vendor Portal', onTap: () => app.setView('vendor-auth')),
                   const SizedBox(width: 8),
                 ],
-                _GhostBtn(
-                  label: app.isLoggedIn ? (app.currentUser?['name']?.toString().split(' ').first ?? 'Account') : 'Sign In',
+                GhostBtn(
+                  label: app.isLoggedIn
+                      ? (app.currentUser?['name']?.toString().split(' ').first ?? 'Account')
+                      : 'Sign In',
                   onTap: () => app.setView('account'),
+                  compact: narrow,
                 ),
-                const SizedBox(width: 8),
-                _GoldBtn(
-                  label: 'Enquire',
-                  color: accent,
-                  onTap: () => app.showToast('Browse profiles', 'Click any card to view profile + inquiry form', '👇'),
-                ),
+                if (screenW(context) > 480) ...[
+                  const SizedBox(width: 8),
+                  GoldBtn(
+                    label: 'Enquire',
+                    color: accent,
+                    onTap: () => app.showToast('Browse profiles', 'Click any card to view profile + inquiry form', '👇'),
+                  ),
+                ],
               ],
             ),
           ),
@@ -565,41 +576,6 @@ class _EdgeFade extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      );
-}
-
-class _GhostBtn extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _GhostBtn({required this.label, required this.onTap});
-  @override
-  Widget build(BuildContext context) => HoverFx(
-        onTap: onTap,
-        builder: (h) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(
-            color: T.gold.withValues(alpha: .06),
-            border: Border.all(color: T.gold.withValues(alpha: .3)),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(label, style: F.syne(size: 12, weight: FontWeight.w700, color: T.gold)),
-        ),
-      );
-}
-
-class _GoldBtn extends StatelessWidget {
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  const _GoldBtn({required this.label, required this.color, required this.onTap});
-  @override
-  Widget build(BuildContext context) => HoverFx(
-        onTap: onTap,
-        builder: (h) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
-          child: Text(label, style: F.syne(size: 12, weight: FontWeight.w700, color: T.bg)),
         ),
       );
 }
