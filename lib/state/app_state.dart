@@ -563,17 +563,16 @@ class AppState extends ChangeNotifier {
   }
 
   /// Pays the advance/deposit via the backend when the user is signed in.
-  Future<bool> payAdvanceApi(String bookingId, String inquiryRef) async {
+  Future<bool> payAdvanceApi(String bookingId, String inquiryRef, String receiptImageUrl) async {
     if (!isLoggedIn) return false;
     try {
-      await _repo.payAdvance(bookingId, inquiryRef);
+      await _repo.payAdvance(bookingId, inquiryRef, receiptImageUrl);
       final i = inquiries.indexWhere((q) => q.ref == inquiryRef);
       if (i != -1) {
-        inquiries[i].advancePaid = true;
-        inquiries[i].status = 'Advance paid';
+        inquiries[i].status = 'Advance submitted';
       }
       notifyListeners();
-      showToast('Advance paid', 'Slot reserved · adjusted against final bill', '💳');
+      showToast('Advance submitted', 'Receipt sent for admin review — slot reserved once approved', '💳');
       return true;
     } catch (_) {
       return false;

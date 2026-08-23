@@ -172,6 +172,24 @@ class _UserAuthState extends State<UserAuth> {
                             textAlign: TextAlign.center,
                             style: F.syne(size: 13, weight: FontWeight.w400, color: T.mut, height: 1.6),
                           ),
+                          const SizedBox(height: 16),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: T.surf,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: T.bdr),
+                            ),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text('▶  Platform walkthrough', style: F.syne(size: 12, weight: FontWeight.w700, color: T.gold)),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Browse verified talent, pay advances with UPI receipts, and unlock plan features from your account.',
+                                style: F.syne(size: 11.5, weight: FontWeight.w400, color: T.mut, height: 1.55),
+                              ),
+                            ]),
+                          ),
                         ]),
                       ),
                       Padding(
@@ -192,7 +210,14 @@ class _UserAuthState extends State<UserAuth> {
                             const SizedBox(height: 12),
                             Text(app.authError!, style: F.syne(size: 12, weight: FontWeight.w600, color: T.redText)),
                           ],
-                          const SizedBox(height: 15),
+                          const SizedBox(height: 12),
+                          Center(
+                            child: TextButton(
+                              onPressed: () => app.setView('subscription'),
+                              child: Text('View plans & features →', style: F.syne(size: 12, weight: FontWeight.w600, color: T.gold)),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                           _PubButton(
                             label: app.authBusy ? 'Please wait…' : (_register ? 'Create Account →' : 'Sign In →'),
                             onTap: app.authBusy ? null : () => _submit(app),

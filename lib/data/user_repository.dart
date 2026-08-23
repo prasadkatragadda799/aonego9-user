@@ -31,6 +31,14 @@ class UserRepository {
 
   Future<void> logout() => ApiClient.clearTokens();
 
+  Future<Map<String, dynamic>> sendOtp(String phone, {String purpose = 'inquiry'}) async {
+    return await ApiClient.post('/auth/otp/send', {'phone': phone, 'purpose': purpose}, auth: false) as Map<String, dynamic>;
+  }
+
+  Future<void> verifyOtp(String phone, String code, {String purpose = 'inquiry'}) async {
+    await ApiClient.post('/auth/otp/verify', {'phone': phone, 'code': code, 'purpose': purpose}, auth: false);
+  }
+
   // ── Browse ────────────────────────────────────────────────────
 
   // GET /api/v1/browse/categories
@@ -215,6 +223,7 @@ class UserRepository {
     required String inquiryRef,
     String message = '',
     bool urgent = false,
+    String phoneOtp = '',
   }) async {
     final data = await ApiClient.post('/browse/inquiry', {
       'vendor_id': vendorId,
@@ -226,18 +235,21 @@ class UserRepository {
       'message': message,
       'urgent': urgent,
       'inquiry_ref': inquiryRef,
-    });
-    return data;
+      'phone_otp': phoneOtp,
+    }, auth: false);
+    return data as Map<String, dynamic>;
   }
 
-  // POST /api/v1/bookings/advance — pay ₹5 000 advance for a booking
-  Future<void> payAdvance(String bookingId, String inquiryRef) async {
-    await ApiClient.post('/bookings/advance', {
+  // POST /api/v1/bookings/advance — submit advance with receipt for admin approval
+  Future<Map<String, dynamic>> payAdvance(String bookingId, String inquiryRef, String receiptImageUrl) async {
+    final data = await ApiClient.post('/bookings/advance', {
       'booking_id': bookingId,
       'inquiry_ref': inquiryRef,
       'amount': 5000,
       'method': 'UPI',
+      'receipt_image': receiptImageUrl,
     });
+    return data as Map<String, dynamic>;
   }
 
   // ── Events ────────────────────────────────────────────────────
