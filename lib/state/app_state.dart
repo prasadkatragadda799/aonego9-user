@@ -381,7 +381,7 @@ class AppState extends ChangeNotifier {
     final rating = (v['rating'] as num?)?.toDouble() ?? 0.0;
     final bookings = (v['total_bookings'] as num?)?.toInt() ?? 0;
     final avatarUrl = (v['avatar_url'] as String?)?.trim() ?? '';
-    final galleryUrls = ((v['gallery_urls'] as List?) ?? [])
+    final galleryUrls = ((v['gallery_urls'] as List?) ?? (v['galleryUrls'] as List?) ?? [])
         .map((e) => e.toString().trim())
         .where((s) => s.isNotEmpty)
         .toList();

@@ -60,6 +60,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _fetchPortfolio();
     _fetchReviews();
     _fetchProfileDetails();
+    _fetchVendorProfile();
+  }
+
+  Future<void> _fetchVendorProfile() async {
+    final vendorId = widget.profile['id'] as String? ?? '';
+    if (vendorId.isEmpty) return;
+    try {
+      final v = await _repo.vendorProfile(vendorId);
+      if (!mounted) return;
+      final galleryUrls = ((v['gallery_urls'] as List?) ?? (v['galleryUrls'] as List?) ?? [])
+          .map((e) => e.toString().trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      setState(() {
+        _mergedProfile = {
+          ..._mergedProfile,
+          'galleryUrls': galleryUrls,
+          'avatarUrl': (v['avatar_url'] as String?)?.trim().isNotEmpty == true
+              ? (v['avatar_url'] as String).trim()
+              : _mergedProfile['avatarUrl'],
+        };
+      });
+    } catch (_) {}
   }
 
   Future<void> _fetchProfileDetails() async {
