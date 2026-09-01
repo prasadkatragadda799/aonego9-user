@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../data/taxonomy.dart';
 import '../theme/tokens.dart';
 import '../state/app_state.dart';
 import 'brand.dart';
+import 'chrome.dart';
 import 'common.dart';
 
 /// Left-hand site panel — Newsletter, About, Partners, Events, plus account.
@@ -20,7 +22,7 @@ class AppDrawer extends StatelessWidget {
       backgroundColor: T.surf,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: T.surf,
           border: Border(right: BorderSide(color: T.bdr)),
         ),
@@ -90,6 +92,20 @@ class AppDrawer extends StatelessWidget {
                       active: app.view == 'events',
                       onTap: () => _go(context, app, 'events'),
                     ),
+                    _Item(
+                      icon: Icons.school_outlined,
+                      label: 'Workshops & Webinars',
+                      hint: 'Clinics, intensives, sessions',
+                      active: app.view == 'sessions',
+                      onTap: () => _go(context, app, 'sessions'),
+                    ),
+                    _Item(
+                      icon: Icons.groups_outlined,
+                      label: 'Our team',
+                      hint: 'The desks behind the floor',
+                      active: app.view == 'team',
+                      onTap: () => _go(context, app, 'team'),
+                    ),
                     const SizedBox(height: 18),
                     const _SectionLabel('Marketplace'),
                     _Item(
@@ -118,6 +134,56 @@ class AppDrawer extends StatelessWidget {
                       active: app.view.startsWith('vendor'),
                       onTap: () => _go(context, app, 'vendor-auth'),
                     ),
+                    const SizedBox(height: 18),
+                    const _SectionLabel('Divisions'),
+                    // Every division reachable in one tap, with its category
+                    // count — the pinned rail only shows one division's
+                    // categories at a time, so this is the full map.
+                    for (final d in divisions)
+                      _Item(
+                        emoji: d.icon,
+                        label: d.name,
+                        hint: d.blurb,
+                        accent: T.dac(d.id),
+                        active: app.view == 'browse' && app.activeDivision == d.id,
+                        onTap: () {
+                          Navigator.of(context).maybePop();
+                          app.switchDivision(d.id);
+                          if (app.view != 'browse') app.backToBrowse();
+                        },
+                      ),
+                    const SizedBox(height: 18),
+                    const _SectionLabel('Get in touch'),
+                    _Item(
+                      icon: Icons.mail_outline_rounded,
+                      label: 'Contact us',
+                      hint: 'Questions, press, support',
+                      active: app.view == 'connect' && app.connectTab == 'contact',
+                      onTap: () {
+                        Navigator.of(context).maybePop();
+                        app.openConnect('contact');
+                      },
+                    ),
+                    _Item(
+                      icon: Icons.badge_outlined,
+                      label: 'Apply',
+                      hint: 'List as artist or vendor',
+                      active: app.view == 'connect' && app.connectTab == 'apply',
+                      onTap: () {
+                        Navigator.of(context).maybePop();
+                        app.openConnect('apply');
+                      },
+                    ),
+                    _Item(
+                      icon: Icons.diversity_3_outlined,
+                      label: 'Join us',
+                      hint: 'Work at AOneGo9',
+                      active: app.view == 'connect' && app.connectTab == 'join',
+                      onTap: () {
+                        Navigator.of(context).maybePop();
+                        app.openConnect('join');
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -127,6 +193,14 @@ class AppDrawer extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text('APPEARANCE',
+                          style: F.syne(
+                              size: 9.5, weight: FontWeight.w700, color: T.dim, letterSpacing: 1.6)),
+                    ),
+                    const ThemeToggle(),
+                    const SizedBox(height: 14),
                     HoverFx(
                       onTap: () => _go(context, app, 'newsletter'),
                       builder: (h) => Container(
@@ -179,21 +253,29 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _Item extends StatelessWidget {
-  final IconData icon;
+  /// Either [icon] or [emoji] — divisions are identified by their glyph
+  /// everywhere else in the app, so they use the emoji form here too.
+  final IconData? icon;
+  final String? emoji;
   final String label;
   final String hint;
   final bool active;
+  /// Null means the brand gold for the active theme.
+  final Color? accent;
   final VoidCallback onTap;
   const _Item({
-    required this.icon,
+    this.icon,
+    this.emoji,
     required this.label,
     required this.hint,
     required this.active,
     required this.onTap,
+    this.accent,
   });
 
   @override
   Widget build(BuildContext context) {
+    final accent = this.accent ?? T.gold;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: HoverFx(
@@ -203,10 +285,10 @@ class _Item extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
           decoration: BoxDecoration(
             color: active
-                ? T.gold.withValues(alpha: .12)
+                ? accent.withValues(alpha: .12)
                 : (h ? T.card : Colors.transparent),
             border: Border.all(
-              color: active ? T.gold.withValues(alpha: .45) : Colors.transparent,
+              color: active ? accent.withValues(alpha: .45) : Colors.transparent,
             ),
             borderRadius: BorderRadius.circular(10),
           ),
@@ -217,23 +299,28 @@ class _Item extends StatelessWidget {
                 height: 34,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: active ? T.gold.withValues(alpha: .16) : T.card,
+                  color: active ? accent.withValues(alpha: .16) : T.card,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, size: 17, color: active || h ? T.gold : T.mut),
+                child: emoji != null
+                    ? Text(emoji!, style: const TextStyle(fontSize: 15))
+                    : Icon(icon, size: 17, color: active || h ? accent : T.mut),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: F.syne(size: 13.5, weight: FontWeight.w700, color: active ? T.gold : T.cream)),
+                    Text(label, style: F.syne(size: 13.5, weight: FontWeight.w700, color: active ? accent : T.cream)),
                     const SizedBox(height: 2),
-                    Text(hint, style: F.syne(size: 11, weight: FontWeight.w400, color: T.dim)),
+                    Text(hint,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: F.syne(size: 11, weight: FontWeight.w400, color: T.dim, height: 1.35)),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, size: 18, color: active ? T.gold : T.faint),
+              Icon(Icons.chevron_right_rounded, size: 18, color: active ? accent : T.faint),
             ],
           ),
         ),

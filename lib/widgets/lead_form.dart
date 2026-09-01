@@ -400,7 +400,7 @@ class _AdvancePayDialogState extends State<_AdvancePayDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: T.card,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: T.bdr)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: T.bdr)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Padding(

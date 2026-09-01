@@ -80,7 +80,7 @@ class _RailLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text(icon, style: const TextStyle(fontSize: 11, color: T.gold)),
+        Text(icon, style: TextStyle(fontSize: 11, color: T.gold)),
         const SizedBox(width: 8),
         Text(label.toUpperCase(),
             style: F.syne(size: 10, weight: FontWeight.w700, color: T.dim, letterSpacing: 2)),

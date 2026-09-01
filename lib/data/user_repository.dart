@@ -356,4 +356,73 @@ class UserRepository {
     final data = await ApiClient.get('/subscriptions/requests/mine') as List;
     return data.cast<Map<String, dynamic>>();
   }
+
+  // ── Directory content ─────────────────────────────────────────
+  // Each of these is additive surface the marketplace didn't have before.
+  // They all resolve to an empty list rather than throwing, because every
+  // caller falls back to seed content — a desk that hasn't published yet
+  // must never blank the page or surface a stack trace to a visitor.
+
+  Future<List<Map<String, dynamic>>> _listFrom(List<String> paths) async {
+    for (final path in paths) {
+      try {
+        final data = await ApiClient.get(path);
+        if (data is List) return data.cast<Map<String, dynamic>>();
+        if (data is Map && data['items'] is List) {
+          return (data['items'] as List).cast<Map<String, dynamic>>();
+        }
+      } catch (_) {
+        // try the next candidate path
+      }
+    }
+    return const [];
+  }
+
+  /// GET /browse/ads — video and photo ad creatives for the display slots.
+  Future<List<Map<String, dynamic>>> ads() =>
+      _listFrom(['/browse/ads', '/cms/ads']);
+
+  /// GET /sessions — workshops and webinars.
+  Future<List<Map<String, dynamic>>> sessions() =>
+      _listFrom(['/sessions', '/events/sessions', '/cms/sessions']);
+
+  /// GET /cms/partners — academic and brand partners with logo artwork.
+  Future<List<Map<String, dynamic>>> partners() =>
+      _listFrom(['/cms/partners', '/browse/partners']);
+
+  /// GET /cms/team — the AOneGo9 desk.
+  Future<List<Map<String, dynamic>>> team() =>
+      _listFrom(['/cms/team', '/browse/team']);
+
+  /// GET /browse/updates — the notification bar feed across every division.
+  Future<List<Map<String, dynamic>>> updates() =>
+      _listFrom(['/browse/updates', '/cms/updates']);
+
+  // ── Lead capture ──────────────────────────────────────────────
+
+  /// POST /browse/leads — contact, join-us and apply forms.
+  ///
+  /// [kind] is one of `contact`, `join`, `apply_artist`, `apply_vendor`.
+  /// Falls back to the newsletter contribution endpoint, which the backend
+  /// already accepts, so a submission is never silently dropped just because
+  /// the dedicated leads route hasn't shipped.
+  Future<void> submitLead(String kind, Map<String, dynamic> payload) async {
+    final body = {...payload, 'kind': kind};
+    try {
+      await ApiClient.post('/browse/leads', body, auth: false);
+      return;
+    } catch (_) {
+      // fall through
+    }
+    await ApiClient.post('/browse/newsletter/contribute', body, auth: false);
+  }
+
+  /// POST /sessions/{id}/register — reserve a seat on a workshop or webinar.
+  Future<void> registerForSession(String sessionId, Map<String, dynamic> payload) async {
+    try {
+      await ApiClient.post('/sessions/$sessionId/register', payload, auth: false);
+    } catch (_) {
+      await submitLead('session_register', {...payload, 'session_id': sessionId});
+    }
+  }
 }

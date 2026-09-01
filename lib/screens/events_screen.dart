@@ -27,8 +27,8 @@ class EventsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             if (app.eventsLoading && events.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 60),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 60),
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: T.gold)),
               )
             else if (events.isEmpty)

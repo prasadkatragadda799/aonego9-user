@@ -18,8 +18,8 @@ class _Pnav extends StatelessWidget {
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: const BoxDecoration(
-        color: Color(0xF709090B),
+      decoration: BoxDecoration(
+        color: T.chrome,
         border: Border(bottom: BorderSide(color: T.bdr)),
       ),
       child: Row(children: [
@@ -77,7 +77,7 @@ class _PubButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (disabled) ...[
-                const SizedBox(
+                SizedBox(
                   height: 14,
                   width: 14,
                   child: CircularProgressIndicator(strokeWidth: 2, color: T.gold),
@@ -159,7 +159,7 @@ class _UserAuthState extends State<UserAuth> {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                       Container(
                         padding: const EdgeInsets.fromLTRB(28, 28, 28, 20),
-                        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: T.bdr))),
+                        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: T.bdr))),
                         child: Column(children: [
                           const BrandLogo(size: 30, variant: LogoVariant.full),
                           const SizedBox(height: 20),

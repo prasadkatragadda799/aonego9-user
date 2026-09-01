@@ -103,8 +103,8 @@ class PageFrame extends StatelessWidget {
         children: [
           Container(
             height: 58,
-            decoration: const BoxDecoration(
-              color: Color(0xF709090B),
+            decoration: BoxDecoration(
+              color: T.chrome,
               border: Border(bottom: BorderSide(color: T.bdr)),
             ),
             child: Center(
@@ -165,19 +165,23 @@ class PageIntro extends StatelessWidget {
   final String eyebrow;
   final String title;
   final String dek;
-  final Color accent;
+
+  /// Null means "the brand gold for the active theme" — it cannot be a
+  /// default value now that gold is a theme-dependent getter.
+  final Color? accent;
   const PageIntro({
     super.key,
     required this.eyebrow,
     required this.title,
     required this.dek,
-    this.accent = T.gold,
+    this.accent,
   });
 
   @override
   Widget build(BuildContext context) {
     final pad = isNarrow(context) ? 16.0 : 24.0;
     final size = (screenW(context) * 0.048).clamp(28.0, 48.0);
+    final accent = this.accent ?? T.gold;
     return Padding(
       padding: EdgeInsets.fromLTRB(pad, isNarrow(context) ? 28 : 40, pad, 8),
       child: Column(
@@ -199,6 +203,107 @@ class PageIntro extends StatelessWidget {
             child: Text(dek, style: F.syne(size: 15, weight: FontWeight.w400, color: T.mut, height: 1.7)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Appearance switch — system / light / dark.
+///
+/// A three-way segmented control rather than a two-state toggle, because
+/// "follow my system" is a real preference and collapsing it into a binary
+/// silently overrides what the visitor already told their OS.
+class ThemeToggle extends StatelessWidget {
+  const ThemeToggle({super.key});
+
+  static const _modes = [
+    (id: 'system', icon: Icons.brightness_auto_rounded, label: 'Auto'),
+    (id: 'light', icon: Icons.light_mode_rounded, label: 'Light'),
+    (id: 'dark', icon: Icons.dark_mode_rounded, label: 'Dark'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: T.bg,
+        border: Border.all(color: T.bdr),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final m in _modes)
+            Expanded(
+              child: HoverFx(
+                onTap: () => app.setThemeMode(m.id),
+                builder: (h) {
+                  final active = app.themeMode == m.id;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 170),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: active
+                          ? T.gold.withValues(alpha: .16)
+                          : (h ? T.card : Colors.transparent),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(m.icon, size: 15, color: active ? T.gold : (h ? T.text : T.dim)),
+                        const SizedBox(height: 4),
+                        Text(
+                          m.label,
+                          style: F.syne(
+                            size: 10,
+                            weight: FontWeight.w700,
+                            color: active ? T.gold : (h ? T.text : T.dim),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One-tap appearance cycle for a crowded toolbar, where the full segmented
+/// control does not fit.
+class ThemeCycleBtn extends StatelessWidget {
+  const ThemeCycleBtn({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final (icon, label) = switch (app.themeMode) {
+      'light' => (Icons.light_mode_rounded, 'Light — tap for dark'),
+      'dark' => (Icons.dark_mode_rounded, 'Dark — tap to follow system'),
+      _ => (Icons.brightness_auto_rounded, 'Following system — tap for light'),
+    };
+    return Tooltip(
+      message: label,
+      child: HoverFx(
+        onTap: app.cycleThemeMode,
+        builder: (h) => AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: h ? T.gold.withValues(alpha: .10) : Colors.transparent,
+            border: Border.all(color: h ? T.gold.withValues(alpha: .45) : T.bdr),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 16, color: h ? T.gold : T.mut),
+        ),
       ),
     );
   }

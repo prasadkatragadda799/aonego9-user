@@ -27,9 +27,9 @@ class ToastView extends StatelessWidget {
           decoration: BoxDecoration(
             color: T.card,
             border: Border(
-              top: const BorderSide(color: T.bdr),
-              right: const BorderSide(color: T.bdr),
-              bottom: const BorderSide(color: T.bdr),
+              top: BorderSide(color: T.bdr),
+              right: BorderSide(color: T.bdr),
+              bottom: BorderSide(color: T.bdr),
               left: BorderSide(color: accent, width: 3),
             ),
             borderRadius: BorderRadius.circular(10),

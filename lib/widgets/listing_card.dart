@@ -143,7 +143,7 @@ class ListingCard extends StatelessWidget {
             // ── Body ──
             Container(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-              decoration: const BoxDecoration(border: Border(top: BorderSide(color: T.bdr))),
+              decoration: BoxDecoration(border: Border(top: BorderSide(color: T.bdr))),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -156,7 +156,7 @@ class ListingCard extends StatelessWidget {
                             final loc = (item['loc'] ?? '').toString().toLowerCase();
                             final panIndia = loc.contains('pan india') || loc.contains('all india');
                             return Row(children: [
-                              Container(width: 6, height: 6, decoration: const BoxDecoration(color: T.grn, shape: BoxShape.circle)),
+                              Container(width: 6, height: 6, decoration: BoxDecoration(color: T.grn, shape: BoxShape.circle)),
                               const SizedBox(width: 6),
                               Text(panIndia ? 'Serves all India' : 'Available in $availIn',
                                   style: F.syne(size: 10.5, weight: FontWeight.w600, color: T.grn)),
@@ -233,7 +233,7 @@ class _Pill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
-        color: const Color(0xE009090B),
+        color: T.scrim,
         border: Border.all(color: Colors.white.withValues(alpha: .1)),
         borderRadius: BorderRadius.circular(20),
       ),

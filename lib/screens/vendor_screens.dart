@@ -19,8 +19,8 @@ class VendorPortalScreen extends StatelessWidget {
           Container(
             height: 56,
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: const BoxDecoration(
-              color: Color(0xF709090B),
+            decoration: BoxDecoration(
+              color: T.chrome,
               border: Border(bottom: BorderSide(color: T.bdr)),
             ),
             child: Row(children: [
@@ -65,19 +65,38 @@ class VendorPortalScreen extends StatelessWidget {
                       Text('Use the AOneGo9 Vendor app', textAlign: TextAlign.center, style: F.fraunces(size: 28, weight: FontWeight.w700, color: T.cream)),
                       const SizedBox(height: 12),
                       Text(
-                        'Profile, portfolio, bookings, earnings and KYC are managed in the dedicated vendor console — not inside the consumer marketplace.',
+                        'Profile, bio data, gallery, brand work, packages, bookings and KYC are managed in '
+                        'the dedicated AOneGo9 Vendor console — not inside the consumer marketplace.',
                         textAlign: TextAlign.center,
                         style: F.syne(size: 14, weight: FontWeight.w400, color: T.mut, height: 1.7),
                       ),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 24),
+                      // Not yet listed? The application is the actual next step —
+                      // this screen used to be a dead end that only offered "go back".
                       GestureDetector(
-                        onTap: () => context.read<AppState>().setView('browse'),
+                        onTap: () => context.read<AppState>().openConnect('apply'),
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           alignment: Alignment.center,
                           decoration: BoxDecoration(color: T.gold, borderRadius: BorderRadius.circular(9)),
-                          child: Text('Back to Marketplace', style: F.syne(size: 14, weight: FontWeight.w700, color: T.bg)),
+                          child: Text('Apply to list your business →',
+                              style: F.syne(size: 14, weight: FontWeight.w700, color: T.bg)),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      GestureDetector(
+                        onTap: () => context.read<AppState>().setView('browse'),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: T.bdr),
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: Text('Back to Marketplace',
+                              style: F.syne(size: 13.5, weight: FontWeight.w600, color: T.mut)),
                         ),
                       ),
                     ],

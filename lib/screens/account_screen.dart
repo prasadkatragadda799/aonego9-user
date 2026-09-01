@@ -53,7 +53,7 @@ class _AccountScreenState extends State<AccountScreen> {
       child: Column(children: [
         Container(
           height: 58,
-          decoration: const BoxDecoration(color: Color(0xF709090B), border: Border(bottom: BorderSide(color: T.bdr))),
+          decoration: BoxDecoration(color: T.chrome, border: Border(bottom: BorderSide(color: T.bdr))),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1280),

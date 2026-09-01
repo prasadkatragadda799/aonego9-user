@@ -1,6 +1,8 @@
-/// Editorial content for the digest, partners page and about story.
+/// Editorial content for the digest and the about story.
 /// Live API payloads overlay this when the backend has published issues.
 library;
+
+import 'directory.dart';
 
 class NewsletterIssue {
   final String id;
@@ -16,6 +18,11 @@ class NewsletterIssue {
   final String? imageUrl;
   final String author;
 
+  /// Industry vertical — fashion, film, music, agency, modelling, production,
+  /// events, organisation. The brief asks the digest to be filterable by the
+  /// industry a story belongs to, not only by happening/trend.
+  final String vertical;
+
   const NewsletterIssue({
     required this.id,
     required this.kind,
@@ -29,9 +36,15 @@ class NewsletterIssue {
     required this.bg,
     this.imageUrl,
     this.author = 'AOneGo9 Desk',
+    this.vertical = 'all',
   });
 
-  factory NewsletterIssue.fromJson(Map<String, dynamic> j) => NewsletterIssue(
+  factory NewsletterIssue.fromJson(Map<String, dynamic> j) {
+    final tag = j['tag'] as String? ?? j['category'] as String? ?? 'Digest';
+    final title = j['title'] as String? ?? '';
+    final body = j['body'] as String? ?? j['content'] as String? ?? '';
+    final declared = (j['vertical'] as String? ?? '').trim().toLowerCase();
+    return NewsletterIssue(
         id: '${j['id'] ?? ''}',
         kind: (j['kind'] as String? ?? j['type'] as String? ?? 'happening').toLowerCase().contains('trend')
             ? 'trend'
@@ -41,12 +54,18 @@ class NewsletterIssue {
         body: j['body'] as String? ?? j['content'] as String? ?? '',
         city: j['city'] as String? ?? 'India',
         date: j['date'] as String? ?? j['published_at'] as String? ?? '',
-        tag: j['tag'] as String? ?? j['category'] as String? ?? 'Digest',
+        tag: tag,
         emoji: j['emoji'] as String? ?? '✦',
         bg: (j['bg'] as num?)?.toInt() ?? 0,
         imageUrl: (j['image_url'] as String?)?.trim().isNotEmpty == true ? j['image_url'] as String : null,
         author: j['author'] as String? ?? j['author_name'] as String? ?? 'AOneGo9 Desk',
+        // Trust the desk's own tagging; infer only when it hasn't tagged one,
+        // so the filter is useful before the backend ships the field.
+        vertical: newsVerticals.any((v) => v.id == declared) && declared != 'all'
+            ? declared
+            : inferVertical(tag, title, body),
       );
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -61,22 +80,8 @@ class NewsletterIssue {
         'bg': bg,
         'image_url': imageUrl,
         'author': author,
+        'vertical': vertical,
       };
-}
-
-class Partner {
-  final String name;
-  final String role;
-  final String blurb;
-  final String emoji;
-  final int bg;
-  const Partner({
-    required this.name,
-    required this.role,
-    required this.blurb,
-    required this.emoji,
-    required this.bg,
-  });
 }
 
 const featuredIssueId = 'nl-lfw-aw26';
@@ -84,6 +89,7 @@ const featuredIssueId = 'nl-lfw-aw26';
 const List<NewsletterIssue> seedNewsletters = [
   NewsletterIssue(
     id: 'nl-lfw-aw26',
+    vertical: 'modelling',
     kind: 'happening',
     title: 'Lakmé Fashion Week AW26 casting is open in Mumbai',
     excerpt: 'Walk, campaign and backstage roles for verified talent. AOneGo9 desks are coordinating fittings this fortnight.',
@@ -98,6 +104,7 @@ const List<NewsletterIssue> seedNewsletters = [
   ),
   NewsletterIssue(
     id: 'nl-palace-winter',
+    vertical: 'events',
     kind: 'happening',
     title: 'Winter palace season: heritage venues filling for Dec–Feb',
     excerpt: 'Jaipur and Udaipur properties are taking hold deposits now. Site visits this month still have weekday slots.',
@@ -111,6 +118,7 @@ const List<NewsletterIssue> seedNewsletters = [
   ),
   NewsletterIssue(
     id: 'nl-sportswear',
+    vertical: 'modelling',
     kind: 'happening',
     title: 'National sportswear campaign: 8-city outdoor + studio',
     excerpt: 'Fitness and athletic talent, pan-India. Test shoots in Bangalore and Delhi next week.',
@@ -124,6 +132,7 @@ const List<NewsletterIssue> seedNewsletters = [
   ),
   NewsletterIssue(
     id: 'nl-verified-photo',
+    vertical: 'production',
     kind: 'happening',
     title: 'Forty new photographers passed verification this week',
     excerpt: 'Wedding, fashion and commercial books just landed on the marketplace. Portfolios are live to browse.',
@@ -137,6 +146,7 @@ const List<NewsletterIssue> seedNewsletters = [
   ),
   NewsletterIssue(
     id: 'nl-trend-intimacy',
+    vertical: 'film',
     kind: 'trend',
     title: 'Intimacy coordinators are becoming a booking default on OTT sets',
     excerpt: 'Verified-client scene work now assumes a coordinator, a script note, and admin pre-approval.',
@@ -150,6 +160,7 @@ const List<NewsletterIssue> seedNewsletters = [
   ),
   NewsletterIssue(
     id: 'nl-trend-handloom',
+    vertical: 'fashion',
     kind: 'trend',
     title: 'Handloom and regional silk are leading national lookbooks',
     excerpt: 'Banarasi, kanjivaram and kasavu are booking ethnic talent with temple and palace locations attached.',
@@ -163,6 +174,7 @@ const List<NewsletterIssue> seedNewsletters = [
   ),
   NewsletterIssue(
     id: 'nl-trend-vertical',
+    vertical: 'production',
     kind: 'trend',
     title: 'Vertical social is now a line item on most packages',
     excerpt: 'Clients ask for 9:16 cuts in the same brief as the hero film. Crews who price it clearly are winning.',
@@ -176,6 +188,7 @@ const List<NewsletterIssue> seedNewsletters = [
   ),
   NewsletterIssue(
     id: 'nl-trend-natural',
+    vertical: 'fashion',
     kind: 'trend',
     title: 'Natural light editorials are outbooking heavy flash setups',
     excerpt: 'Skincare, fragrance and lifestyle briefs want window light and locations with a point of view.',
@@ -185,65 +198,6 @@ const List<NewsletterIssue> seedNewsletters = [
     date: '07 Aug 2026',
     tag: 'Light',
     emoji: '🌿',
-    bg: 7,
-  ),
-];
-
-const List<Partner> seedPartners = [
-  Partner(
-    name: 'Lakmé Fashion Week',
-    role: 'Runway week',
-    blurb: 'Casting, fittings and backstage crews coordinated through verified AOneGo9 talent books.',
-    emoji: '✨',
-    bg: 2,
-  ),
-  Partner(
-    name: 'FDCI',
-    role: 'Fashion council',
-    blurb: 'India Fashion Week walk and campaign shortlists drawn from KYC-verified profiles.',
-    emoji: '👗',
-    bg: 5,
-  ),
-  Partner(
-    name: 'Producers Guild of India',
-    role: 'Film & OTT',
-    blurb: 'Scene-matrix protocols, intimacy coordinators and production-house verification on set bookings.',
-    emoji: '🎬',
-    bg: 4,
-  ),
-  Partner(
-    name: 'Wedding Design Week',
-    role: 'Celebrations',
-    blurb: 'Heritage venues, film crews and talent for destination weeks — with packages visible before inquiry.',
-    emoji: '💒',
-    bg: 0,
-  ),
-  Partner(
-    name: 'Crafts Council partners',
-    role: 'Handloom',
-    blurb: 'Textile campaigns that need ethnic talent, temple locations and documentary stills in the same team.',
-    emoji: '🧵',
-    bg: 3,
-  ),
-  Partner(
-    name: 'National tourism boards',
-    role: 'Location',
-    blurb: 'Lifestyle and destination films that pair local crews with pan-India talent who can travel.',
-    emoji: '🗺️',
-    bg: 1,
-  ),
-  Partner(
-    name: 'Independent music labels',
-    role: 'Music video',
-    blurb: 'Lead-role talent and cinematographers for narrative videos, with rights and call-sheet hygiene built in.',
-    emoji: '🎵',
-    bg: 6,
-  ),
-  Partner(
-    name: 'Studio collectives',
-    role: 'Production',
-    blurb: 'Daylight studios and equipment rooms listed as venues so producers can hold a space and a crew together.',
-    emoji: '📷',
     bg: 7,
   ),
 ];

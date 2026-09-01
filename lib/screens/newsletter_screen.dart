@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
 import '../state/app_state.dart';
+import '../data/directory.dart';
 import '../data/editorial.dart';
 import '../data/upload_service.dart';
 import '../widgets/chrome.dart';
@@ -26,12 +27,22 @@ class NewsletterScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const PageIntro(
-              eyebrow: 'AOneGo9 Digest',
+              eyebrow: 'Industry news & media update',
               title: 'What\'s happening, and what\'s next.',
-              dek: 'Castings, venues, campaigns — plus the trends crews are actually booking. Submitted stories go live after credentials are checked.',
+              dek: 'Fashion, film, music, modelling, production houses and industry bodies — castings, '
+                  'venues and campaigns, plus the trends crews are actually booking. Submitted stories '
+                  'go live after credentials are checked.',
             ),
             const SizedBox(height: 8),
             _Tabs(active: app.newsletterTab, onChange: app.setNewsletterTab),
+            const SizedBox(height: 16),
+            // Industry verticals — fashion, film, music, agencies, modelling,
+            // production houses, events and industry bodies.
+            _VerticalFilter(
+              active: app.newsVertical,
+              populated: app.populatedVerticals,
+              onChange: app.setNewsVertical,
+            ),
             const SizedBox(height: 22),
             if (app.selectedIssue != null) ...[
               _IssueDetail(issue: app.selectedIssue!),
@@ -45,6 +56,47 @@ class NewsletterScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Industry vertical chips.
+class _VerticalFilter extends StatelessWidget {
+  final String active;
+  final Set<String> populated;
+  final ValueChanged<String> onChange;
+  const _VerticalFilter({required this.active, required this.populated, required this.onChange});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final v in newsVerticals)
+          if (v.id == 'all' || populated.contains(v.id))
+            HoverFx(
+              onTap: () => onChange(v.id),
+              builder: (h) => AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                decoration: BoxDecoration(
+                  color: active == v.id ? T.gold.withValues(alpha: .14) : Colors.transparent,
+                  border: Border.all(color: active == v.id ? T.gold : (h ? T.bdhi : T.bdr)),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(v.icon, style: const TextStyle(fontSize: 11)),
+                  const SizedBox(width: 6),
+                  Text(v.name,
+                      style: F.syne(
+                          size: 11.5,
+                          weight: FontWeight.w700,
+                          color: active == v.id ? T.gold : (h ? T.text : T.mut))),
+                ]),
+              ),
+            ),
+      ],
     );
   }
 }
@@ -164,7 +216,7 @@ class _IssueCard extends StatelessWidget {
                     left: 12,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: const Color(0xE009090B), borderRadius: BorderRadius.circular(4)),
+                      decoration: BoxDecoration(color: T.scrim, borderRadius: BorderRadius.circular(4)),
                       child: Text(issue.kind == 'trend' ? 'TREND' : 'HAPPENING',
                           style: F.syne(size: 10, weight: FontWeight.w700, color: T.gold, letterSpacing: 1.4)),
                     ),

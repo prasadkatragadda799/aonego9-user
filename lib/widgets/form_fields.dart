@@ -13,14 +13,16 @@ class Fl extends StatelessWidget {
       );
 }
 
-const _fiBorder = OutlineInputBorder(
-  borderSide: BorderSide(color: T.bdr),
-  borderRadius: BorderRadius.all(Radius.circular(7)),
-);
-const _fiFocus = OutlineInputBorder(
-  borderSide: BorderSide(color: T.gold),
-  borderRadius: BorderRadius.all(Radius.circular(7)),
-);
+// Getters, not consts: the border colours are theme tokens now, and a
+// top-level const would freeze whichever theme happened to load first.
+OutlineInputBorder get _fiBorder => OutlineInputBorder(
+      borderSide: BorderSide(color: T.bdr),
+      borderRadius: const BorderRadius.all(Radius.circular(7)),
+    );
+OutlineInputBorder get _fiFocus => OutlineInputBorder(
+      borderSide: BorderSide(color: T.gold),
+      borderRadius: const BorderRadius.all(Radius.circular(7)),
+    );
 
 /// `.fi` — text input. Pass [controller] to read the value.
 class Fi extends StatelessWidget {
@@ -83,7 +85,7 @@ class _FiSelectState extends State<FiSelect> {
           isExpanded: true,
           isDense: true,
           dropdownColor: T.card,
-          icon: const Icon(Icons.keyboard_arrow_down, color: T.dim, size: 18),
+          icon: Icon(Icons.keyboard_arrow_down, color: T.dim, size: 18),
           style: F.syne(size: 13, weight: FontWeight.w400, color: T.text),
           items: [
             for (final o in widget.options)

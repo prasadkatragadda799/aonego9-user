@@ -1,7 +1,10 @@
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/api_client.dart';
+import '../data/directory.dart';
 import '../data/editorial.dart';
+import '../data/geo.dart';
+import '../data/taxonomy.dart';
 import '../data/user_repository.dart';
 import '../data/vendor_profile_utils.dart';
 
@@ -38,12 +41,22 @@ class Inquiry {
 
 /// AppState — direct port of App()'s useState machine.
 class AppState extends ChangeNotifier {
-  String view = 'browse'; // browse | profile | vendor-auth | vendor-dash | vendor-edit | newsletter | events | about | partners | login | account | subscription
+  String view = 'browse'; // browse | profile | vendor-auth | newsletter | events | about | partners | team | sessions | connect | login | account | subscription
   Map<String, dynamic>? selectedProfile;
   NewsletterIssue? selectedIssue;
+
+  /// The rail is two levels now: a division holds several categories.
+  /// [activeDivision] is always [activeCat]'s own division — see [switchCat].
+  String activeDivision = 'talent';
   String activeCat = 'modelF';
   String filter = 'All';
   String newsletterTab = 'happening'; // happening | trend
+
+  /// Industry vertical filter on the digest ('all' = unfiltered).
+  String newsVertical = 'all';
+
+  /// Which form the Connect screen opens on: contact | join | apply.
+  String connectTab = 'contact';
 
   bool showNewsletterPopup = false;
   bool newsletterSubscribed = false;
@@ -52,7 +65,56 @@ class AppState extends ChangeNotifier {
   /// available here, so "in my location I see what's available". A profile
   /// whose location is Pan-India serves every city.
   String location = 'Mumbai';
-  static const List<String> cities = ['Mumbai', 'Delhi NCR', 'Bangalore', 'All India'];
+
+  /// Shortcut cities kept for the footer's "Cities" column. The full
+  /// state → city → area hierarchy lives in [GeoIndex]; this is just the
+  /// handful worth a permanent link.
+  static const List<String> cities = ['Mumbai', 'Delhi NCR', 'Bangalore', 'Hyderabad', 'Chennai', kAllIndia];
+
+  /// The state [location] sits in, or '' when it is a state itself or
+  /// [kAllIndia]. Shown next to the city in the search bar.
+  String get locationState => GeoIndex.stateOfCity(location);
+
+  /// ── Appearance ───────────────────────────────────────────────
+  /// 'system' | 'dark' | 'light'. Persisted, and defaults to following the
+  /// OS so a visitor who runs their phone in light mode is not handed a dark
+  /// page on first paint.
+  String themeMode = 'system';
+
+  /// Resolve the stored preference against the platform's current brightness.
+  Brightness resolveBrightness(Brightness platform) => switch (themeMode) {
+        'dark' => Brightness.dark,
+        'light' => Brightness.light,
+        _ => platform,
+      };
+
+  Future<void> setThemeMode(String mode) async {
+    if (themeMode == mode) return;
+    themeMode = mode;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('theme_mode', mode);
+  }
+
+  /// Steps system → light → dark → system, which is what the single
+  /// toolbar button cycles through.
+  void cycleThemeMode() => setThemeMode(switch (themeMode) {
+        'system' => 'light',
+        'light' => 'dark',
+        _ => 'system',
+      });
+
+  Future<void> _restoreThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('theme_mode');
+    if (saved != null && saved != themeMode && const ['system', 'dark', 'light'].contains(saved)) {
+      themeMode = saved;
+      notifyListeners();
+    }
+  }
+
+  /// Free-text marketplace search — name, tagline, tags, city.
+  String query = '';
   ToastMsg? toast;
   String vendorName = 'Vendor';
 
@@ -145,14 +207,28 @@ class AppState extends ChangeNotifier {
   bool listingsLoading = false;
   bool eventsLoading = false;
 
-  static const _defaultFilters = <String, List<String>>{
-    'venue': ['All', 'Indoor', 'Outdoor', 'Rooftop', 'Heritage'],
-    'photo': ['All', 'Fashion', 'Wedding', 'Commercial', 'Portrait'],
-    'video': ['All', 'Brand Films', 'Wedding', 'Social Media', 'Documentary'],
-    'modelF': ['All', 'Fashion', 'Ethnic', 'Ramp', 'Film', 'Commercial', 'Fitness'],
-    'modelM': ['All', 'Fashion', 'Ethnic', 'Ramp', 'Film', 'Commercial', 'Fitness'],
-    'events': ['All', 'Fashion Shows', 'Corporate', 'Wedding Events', 'Concerts'],
-  };
+  /// ── Directory feeds ─────────────────────────────────────────
+  /// Each falls back to its seed list when the desk has published nothing,
+  /// so no page is ever an empty wall on a fresh deployment.
+  List<AdCreative> _ads = List.of(seedAds);
+  List<Session> _sessions = List.of(seedSessions);
+  List<LogoPartner> _logoPartners = [...seedAcademicPartners, ...seedBrandPartners];
+  List<TeamMember> _team = List.of(seedTeam);
+  List<Map<String, dynamic>> _updates = const [];
+
+  List<AdCreative> get ads => _ads;
+  List<Session> get sessions => _sessions;
+  List<TeamMember> get team => _team;
+  List<LogoPartner> get academicPartners =>
+      _logoPartners.where((p) => p.tier == PartnerTier.academic).toList();
+  List<LogoPartner> get brandPartners =>
+      _logoPartners.where((p) => p.tier != PartnerTier.academic).toList();
+
+  List<Session> get workshops => _sessions.where((s) => !s.isWebinar).toList();
+  List<Session> get webinars => _sessions.where((s) => s.isWebinar).toList();
+
+  /// Filter chips fall back to the catalogue when the backend hasn't
+  /// published a set for a category.
 
   /// Real per-category listing counts, filled in as each category is
   /// visited this session. Never guessed/faked — a category the user
@@ -163,41 +239,97 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> get apiListings => _apiListings ?? [];
   List<Map<String, dynamic>> get tickerEvents => _apiTickerEvents ?? [];
   List<NewsletterIssue> get newsletters => _newsletters;
-  List<NewsletterIssue> get happeningIssues =>
-      _newsletters.where((n) => n.kind == 'happening').toList();
-  List<NewsletterIssue> get trendIssues =>
-      _newsletters.where((n) => n.kind == 'trend').toList();
+  List<NewsletterIssue> get happeningIssues => _byVertical('happening');
+  List<NewsletterIssue> get trendIssues => _byVertical('trend');
+
+  /// Issues of one kind, narrowed to [newsVertical] when a vertical is picked.
+  List<NewsletterIssue> _byVertical(String kind) => _newsletters
+      .where((n) => n.kind == kind)
+      .where((n) => newsVertical == 'all' || n.vertical == newsVertical)
+      .toList();
+
+  /// Verticals that actually have a story behind them, so the filter row never
+  /// offers a chip that leads to an empty page.
+  Set<String> get populatedVerticals =>
+      {for (final n in _newsletters) n.vertical};
   NewsletterIssue get featuredIssue {
     final match = _newsletters.where((n) => n.id == featuredIssueId);
     return match.isNotEmpty ? match.first : _newsletters.first;
   }
   List<Map<String, dynamic>> get platformEvents => _platformEvents;
-  List<String> filtersFor(String catId) => _apiFilters[catId] ?? _defaultFilters[catId] ?? const ['All'];
 
-  static String _catIdFromSlug(String slug) => switch (slug) {
-        'venues' => 'venue',
-        'photography' => 'photo',
-        'videography' => 'video',
-        'models' => 'modelF',
-        'event-services' => 'events',
-        _ => slug,
-      };
+  /// The notification bar's feed: every division's upcoming activity in one
+  /// stream — platform events, workshops and webinars — newest first and
+  /// scoped to the browsing location.
+  ///
+  /// Built from what is already loaded rather than a separate request, so the
+  /// bar is populated on first paint instead of after a second round trip.
+  List<UpdateEntry> get updateFeed {
+    final out = <UpdateEntry>[];
+
+    for (final u in _updates) {
+      out.add(UpdateEntry(
+        id: '${u['id'] ?? ''}',
+        kind: (u['kind'] as String? ?? 'update'),
+        division: u['division'] as String? ?? '',
+        title: u['title'] as String? ?? '',
+        city: u['city'] as String? ?? '',
+        state: u['state'] as String? ?? '',
+        date: u['date'] as String? ?? '',
+        emoji: u['emoji'] as String? ?? '📣',
+        live: u['live'] == true || u['on_poster'] == true,
+      ));
+    }
+
+    for (final e in _platformEvents) {
+      final city = '${e['city'] ?? ''}';
+      out.add(UpdateEntry(
+        id: '${e['id'] ?? ''}',
+        kind: 'event',
+        division: 'crew',
+        title: '${e['title'] ?? ''}',
+        city: city,
+        state: GeoIndex.stateOfCity(city),
+        date: '${e['date'] ?? ''}',
+        emoji: '${e['emoji'] ?? '📅'}',
+        live: e['on_poster'] == true,
+      ));
+    }
+
+    for (final w in _sessions) {
+      out.add(UpdateEntry(
+        id: w.id,
+        kind: w.isWebinar ? 'webinar' : 'workshop',
+        division: w.division,
+        title: w.title,
+        city: w.city,
+        state: w.state.isNotEmpty ? w.state : GeoIndex.stateOfCity(w.city),
+        date: w.date,
+        emoji: w.emoji,
+        live: w.nearlyFull,
+      ));
+    }
+
+    final scoped = out.where((u) {
+      // Online sessions have no city and belong to everyone.
+      if (u.city.isEmpty || u.city.toLowerCase() == 'online') return true;
+      return GeoIndex.matches(selected: location, listingCity: u.city);
+    }).toList();
+
+    scoped.sort((a, b) => a.date.compareTo(b.date));
+    return scoped;
+  }
+  List<String> filtersFor(String catId) => _apiFilters[catId] ?? catOf(catId)?.filters ?? const ['All'];
 
   /// Vendors self-report a free-text category at registration (e.g.
   /// "Photography"), matched case-insensitively as a substring by the
-  /// backend. The app's internal category ids don't all line up with that
-  /// text 1:1, so map to a term that actually appears in real vendor data.
+  /// backend. Both the slug mapping and the search term now come from the
+  /// catalogue, so a new vertical needs no change here.
+  ///
   /// Note: the backend has no gender field on vendors, so "Female Models"
-  /// and "Male Models" both search the same "talent" term — there's no way
+  /// and "Male Models" both search the same "talent" term — there is no way
   /// to tell them apart server-side with the current schema.
-  static String _searchTermFor(String catId) => switch (catId) {
-        'photo' => 'photography',
-        'video' => 'videography',
-        'venue' => 'venue',
-        'events' => 'event',
-        'modelF' || 'modelM' => 'talent',
-        _ => catId,
-      };
+  static String _searchTermFor(String catId) => catOf(catId)?.searchTerm ?? catId;
 
   /// Fetch listings from the backend and normalise each vendor map so the
   /// existing UI widgets (ListingCard, ProfileScreen) work without changes.
@@ -205,13 +337,20 @@ class AppState extends ChangeNotifier {
     listingsLoading = true;
     notifyListeners();
     try {
+      // A state cannot be sent as `city` — the backend would match nothing.
+      // In that case fetch broadly and narrow locally, which also means
+      // asking for more rows than one screen's worth.
+      final narrowsLocally = GeoIndex.needsClientNarrowing(location);
       final results = await _repo.listings(
         category: _searchTermFor(activeCat),
-        city: location == 'All India' ? null : location,
+        city: GeoIndex.cityParamFor(location),
         filter: filter == 'All' ? null : filter,
+        pageSize: narrowsLocally || query.isNotEmpty ? 60 : 20,
       );
       _apiListings = results.map(_normaliseVendor).toList();
-      _categoryCounts[activeCat] = _apiListings!.length;
+      // Count what is actually browsable here, not what the request returned —
+      // otherwise the rail badge disagrees with the grid under it.
+      _categoryCounts[activeCat] = _scopedToLocation(_apiListings!).length;
     } catch (_) {
       _apiListings = [];
     } finally {
@@ -262,6 +401,33 @@ class AppState extends ChangeNotifier {
       'emoji': e['emoji'] ?? '📅',
       'bg': (e['bg'] as num?)?.toInt() ?? 0,
     };
+  }
+
+  /// Ads, sessions, partners, team and the updates feed. Each keeps its seed
+  /// list on failure or an empty response — see [_ads] and friends.
+  Future<void> fetchDirectory() async {
+    final results = await Future.wait([
+      _repo.ads(),
+      _repo.sessions(),
+      _repo.partners(),
+      _repo.team(),
+      _repo.updates(),
+    ]);
+
+    final ads = results[0].map(AdCreative.fromJson).where((a) => a.headline.isNotEmpty).toList();
+    if (ads.isNotEmpty) _ads = ads;
+
+    final sessions = results[1].map(Session.fromJson).where((x) => x.title.isNotEmpty).toList();
+    if (sessions.isNotEmpty) _sessions = sessions;
+
+    final partners = results[2].map(LogoPartner.fromJson).where((x) => x.name.isNotEmpty).toList();
+    if (partners.isNotEmpty) _logoPartners = partners;
+
+    final team = results[3].map(TeamMember.fromJson).where((x) => x.name.isNotEmpty).toList();
+    if (team.isNotEmpty) _team = team;
+
+    _updates = results[4];
+    notifyListeners();
   }
 
   Future<void> fetchNewsletters() async {
@@ -348,7 +514,12 @@ class AppState extends ChangeNotifier {
     try {
       final cats = await _repo.categories();
       for (final c in cats) {
-        final catId = _catIdFromSlug(c['slug'] as String? ?? '');
+        final slug = c['slug'] as String? ?? '';
+        final catId = catIdFromSlug(slug);
+        // catIdFromSlug falls back to modelF for anything it cannot place.
+        // Accepting that here would let an unrelated backend category
+        // overwrite the female-models filter chips and count.
+        if (slug.isEmpty || (catId == 'modelF' && !_looksLikeFemaleModels(slug))) continue;
         final filters = (c['filters'] as List?)?.cast<String>() ?? const ['All'];
         _apiFilters[catId] = filters;
         if (catId == 'modelF') _apiFilters['modelM'] = filters;
@@ -359,22 +530,20 @@ class AppState extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Guards the modelF fallback in [catIdFromSlug] — only a slug that really
+  /// is the female-models category may claim it.
+  static bool _looksLikeFemaleModels(String slug) {
+    final s = slug.toLowerCase();
+    return s == 'models' || s == 'modelf' || s.contains('female') || s.contains('talent');
+  }
+
   /// Map a backend vendor JSON to the shape the UI expects.
   static Map<String, dynamic> _normaliseVendor(Map<String, dynamic> v) {
-    // Map backend category string → user app cat id
-    final rawCat = (v['category'] as String? ?? '').toLowerCase();
-    String cat = 'modelF';
-    if (rawCat.contains('photo')) {
-      cat = 'photo';
-    } else if (rawCat.contains('video')) {
-      cat = 'video';
-    } else if (rawCat.contains('venue')) {
-      cat = 'venue';
-    } else if (rawCat.contains('event')) {
-      cat = 'events';
-    } else if (rawCat.contains('male')) {
-      cat = 'modelM';
-    }
+    // Map the vendor's free-text category onto a catalogue id. The old
+    // inline if-chain only knew the original six and, worse, matched
+    // "female" against `contains('male')` — every female model was filed
+    // as modelM. [catIdFromBackend] checks the most specific terms first.
+    final cat = catIdFromBackend(v['category'] as String? ?? '');
 
     final name = v['name'] as String? ?? v['company'] as String? ?? '';
     final city = v['city'] as String? ?? '';
@@ -477,6 +646,8 @@ class AppState extends ChangeNotifier {
     fetchCategories();
     fetchPlatformEvents();
     fetchNewsletters();
+    fetchDirectory();
+    _restoreThemeMode();
     restoreSession();
     _maybeShowNewsletterPopup();
   }
@@ -485,22 +656,51 @@ class AppState extends ChangeNotifier {
   /// Only affects the INITIAL screen — no effect on UI/UX otherwise.
   void _initFromUrl() {
     final loc = Uri.base.queryParameters['loc'];
-    if (loc != null && cities.contains(loc)) location = loc;
+    if (loc != null && loc.isNotEmpty) {
+      // Accepts a city, a state or an area name — the old check only allowed
+      // the four hardcoded cities, so ?loc=Hyderabad was silently ignored.
+      final resolved = GeoIndex.resolve(loc);
+      if (resolved != null) location = resolved;
+    }
+    final q = Uri.base.queryParameters['q'];
+    if (q != null && q.trim().isNotEmpty) query = q.trim();
     final go = Uri.base.queryParameters['go'];
     if (go == null || go.isEmpty) return;
     final parts = go.split('/');
     switch (parts[0]) {
       case 'browse':
-        if (parts.length > 1) activeCat = parts[1];
+        if (parts.length > 1 && catById.containsKey(parts[1])) {
+          activeCat = parts[1];
+          activeDivision = divisionOf(activeCat);
+        }
+        break;
+      case 'division':
+        // ?go=division/beauty — land on a division's first category.
+        if (parts.length > 1) {
+          final cats = catsByDivision[parts[1]];
+          if (cats != null && cats.isNotEmpty) {
+            activeDivision = parts[1];
+            activeCat = cats.first.id;
+          }
+        }
         break;
       case 'profile':
         final id = parts.length > 1 ? parts[1] : '';
         if (id.isNotEmpty) _openSharedProfile(id);
         break;
+      case 'connect':
+        // ?go=connect/join — deep link straight to a form.
+        if (parts.length > 1 && const ['contact', 'join', 'apply'].contains(parts[1])) {
+          connectTab = parts[1];
+        }
+        view = 'connect';
+        break;
       case 'newsletter':
       case 'events':
       case 'about':
       case 'partners':
+      case 'team':
+      case 'sessions':
         view = parts[0];
         break;
       case 'vendor-auth':
@@ -529,17 +729,132 @@ class AppState extends ChangeNotifier {
   }
 
   /// Real listings for the active category, straight from the backend.
-  /// [_apiListings] is always scoped to [activeCat] already (that's what
-  /// gets requested), so no further filtering is needed here. Empty means
-  /// genuinely no vendors yet — never backfilled with placeholder profiles.
-  List<Map<String, dynamic>> get catItems => _apiListings ?? [];
+  ///
+  /// [_apiListings] is already scoped to [activeCat] server-side. Two filters
+  /// are still applied here:
+  ///
+  ///   · the free-text [query], because the backend has no search parameter
+  ///     and matching client-side is better than no search at all;
+  ///   · the geo match, because [location] can now be a STATE, which the
+  ///     backend's single `city` parameter cannot express.
+  ///
+  /// Empty means genuinely no vendors — never backfilled with placeholders.
+  /// Narrow a result set to [location] — but ONLY for a state, which is the
+  /// one thing the backend's single `city` parameter cannot express.
+  ///
+  /// Re-filtering a city the backend already filtered would hide any listing
+  /// whose city string [geoStates] happens not to list (a vendor in Ghaziabad
+  /// browsing "Delhi NCR", say), which is a regression this guard exists to
+  /// prevent.
+  List<Map<String, dynamic>> _scopedToLocation(List<Map<String, dynamic>> items) {
+    if (!GeoIndex.needsClientNarrowing(location)) return items;
+    return items
+        .where((v) => GeoIndex.matches(selected: location, listingCity: '${v['loc'] ?? ''}'))
+        .toList();
+  }
 
-  void setLocation(String city) {
-    if (location == city) return;
-    location = city;
+  List<Map<String, dynamic>> get catItems {
+    var items = _scopedToLocation(_apiListings ?? const <Map<String, dynamic>>[]);
+
+    final q = query.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      items = items.where((v) {
+        final tags = ((v['tags'] as List?) ?? const []).join(' ');
+        final haystack = [
+          v['name'], v['loc'], v['tagline'], v['badge'], tags,
+          catOf(v['cat'] as String?)?.name,
+        ].map((e) => '${e ?? ''}').join(' ').toLowerCase();
+        return haystack.contains(q);
+      }).toList();
+    }
+
+    return items;
+  }
+
+  /// True when the grid is empty only because a filter is on — so the empty
+  /// state can offer to clear it instead of claiming the category is bare.
+  bool get filteredToNothing =>
+      (_apiListings?.isNotEmpty ?? false) && catItems.isEmpty;
+
+  /// Accepts a city, a state, or [kAllIndia].
+  void setLocation(String place) {
+    if (location == place) return;
+    location = place;
     _apiListings = null; // clear so UI shows a loading state while re-fetching
     notifyListeners();
     fetchListings();
+  }
+
+  /// Free-text search. Filters locally and, when the term looks like a place,
+  /// also moves the location — typing "Jaipur" should show Jaipur, not zero
+  /// results for a vendor literally named Jaipur.
+  void setQuery(String q) {
+    final next = q.trim();
+    if (query == next) return;
+    query = next;
+
+    final place = next.isEmpty ? null : GeoIndex.resolve(next);
+    if (place != null && place != location) {
+      location = place;
+      query = ''; // the term was consumed as a location
+      _apiListings = null;
+      notifyListeners();
+      fetchListings();
+      return;
+    }
+    notifyListeners();
+  }
+
+  void clearQuery() {
+    if (query.isEmpty) return;
+    query = '';
+    notifyListeners();
+  }
+
+  /// Switch the primary rail. Selects the division's first category so the
+  /// grid always shows something rather than an empty division.
+  void switchDivision(String id) {
+    if (activeDivision == id) return;
+    activeDivision = id;
+    final first = catsByDivision[id];
+    if (first != null && first.isNotEmpty) {
+      switchCat(first.first.id);
+    } else {
+      notifyListeners();
+    }
+  }
+
+  void setNewsVertical(String v) {
+    if (newsVertical == v) return;
+    newsVertical = v;
+    notifyListeners();
+  }
+
+  void openConnect(String tab) {
+    connectTab = tab;
+    view = 'connect';
+    notifyListeners();
+  }
+
+  /// Submit one of the contact / join / apply forms.
+  Future<bool> submitLead(String kind, Map<String, dynamic> payload) async {
+    try {
+      await _repo.submitLead(kind, payload);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> registerForSession(Session session, Map<String, dynamic> payload) async {
+    try {
+      await _repo.registerForSession(session.id, payload);
+      showToast('Seat requested', '${session.title} — the desk will confirm by email', '🎟️');
+      return true;
+    } catch (_) {
+      showToast('Could not register', 'Try again in a moment', '⚠️');
+      return false;
+    }
   }
 
   void showToast(String t, String b, [String i = '✅']) {
@@ -579,6 +894,15 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Opens a profile from a RAW backend vendor payload (ads, updates, search
+  /// results) rather than an already-normalised listing map.
+  void openVendorById(Map<String, dynamic> vendor) {
+    final normalised = _normaliseVendor(vendor);
+    activeCat = normalised['cat'] as String;
+    activeDivision = divisionOf(activeCat);
+    openProfile(normalised);
+  }
+
   void openProfile(Map<String, dynamic> item) {
     selectedProfile = item;
     view = 'profile';
@@ -589,6 +913,7 @@ class AppState extends ChangeNotifier {
 
   void switchCat(String id) {
     activeCat = id;
+    activeDivision = divisionOf(id);
     filter = 'All';
     _apiListings = null; // clear so UI shows a loading state while re-fetching
     notifyListeners();

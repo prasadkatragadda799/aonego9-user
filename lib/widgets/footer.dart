@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
-import '../data/app_data.dart';
+import '../data/taxonomy.dart';
 import '../state/app_state.dart';
 import 'brand.dart';
 import 'common.dart';
@@ -22,7 +22,7 @@ class SiteFooter extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: T.surf,
         border: Border(top: BorderSide(color: T.bdr)),
       ),
@@ -35,7 +35,7 @@ class SiteFooter extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Wrap(
-                  spacing: 56,
+                  spacing: 44,
                   runSpacing: 34,
                   crossAxisAlignment: WrapCrossAlignment.start,
                   children: [
@@ -49,9 +49,9 @@ class SiteFooter extends StatelessWidget {
                           const BrandLogo(size: 24, variant: LogoVariant.full),
                           const SizedBox(height: 16),
                           Text(
-                            'India\'s curated marketplace for verified models, '
-                            'photographers, videographers, venues and event teams. '
-                            'Browse full portfolios and pricing before you reach out.',
+                            'India\'s curated marketplace for verified talent, crews, studios, '
+                            'designers, venues, stays and academies. Browse full portfolios and '
+                            'pricing before you reach out.',
                             style: F.syne(size: 12.5, weight: FontWeight.w400, color: T.mut, height: 1.7),
                           ),
                           const SizedBox(height: 14),
@@ -59,7 +59,7 @@ class SiteFooter extends StatelessWidget {
                             Container(
                               width: 6,
                               height: 6,
-                              decoration: const BoxDecoration(color: T.grn, shape: BoxShape.circle),
+                              decoration: BoxDecoration(color: T.grn, shape: BoxShape.circle),
                             ),
                             const SizedBox(width: 7),
                             Text('Every listing admin-verified',
@@ -68,16 +68,22 @@ class SiteFooter extends StatelessWidget {
                         ],
                       ),
                     ),
-                    // ── Browse by category ──
+                    // ── Browse by division ──
+                    // Listing all sixteen categories here made the footer
+                    // taller than the page; divisions land you in the right
+                    // room and the pinned rail takes it from there.
                     _Col(
-                      title: 'Browse',
+                      title: 'Divisions',
                       children: [
-                        for (final c in cats)
+                        for (final d in divisions)
                           _Link(
-                            label: '${c['icon']} ${c['name']}',
-                            active: app.activeCat == c['id'],
-                            accent: T.ac(c['id'] as String?),
-                            onTap: () => app.switchCat(c['id'] as String),
+                            label: '${d.icon} ${d.name}',
+                            active: app.activeDivision == d.id,
+                            accent: T.dac(d.id),
+                            onTap: () {
+                              app.switchDivision(d.id);
+                              if (app.view != 'browse') app.backToBrowse();
+                            },
                           ),
                       ],
                     ),
@@ -94,14 +100,24 @@ class SiteFooter extends StatelessWidget {
                           ),
                       ],
                     ),
-                    // ── Account ──
                     _Col(
                       title: 'Discover',
                       children: [
-                        _Link(label: 'Newsletter', accent: T.gold, onTap: () => app.setView('newsletter')),
+                        _Link(label: 'Industry news', accent: T.gold, onTap: () => app.setView('newsletter')),
                         _Link(label: 'Events', accent: T.gold, onTap: () => app.setView('events')),
+                        _Link(label: 'Workshops & webinars', accent: T.gold, onTap: () => app.setView('sessions')),
+                        _Link(label: 'Partners', accent: T.gold, onTap: () => app.setView('partners')),
                         _Link(label: 'About', accent: T.gold, onTap: () => app.setView('about')),
-                        _Link(label: 'Partnered with', accent: T.gold, onTap: () => app.setView('partners')),
+                        _Link(label: 'Our team', accent: T.gold, onTap: () => app.setView('team')),
+                      ],
+                    ),
+                    _Col(
+                      title: 'Company',
+                      children: [
+                        _Link(label: 'Contact us', accent: T.gold, onTap: () => app.openConnect('contact')),
+                        _Link(label: 'Join us', accent: T.gold, onTap: () => app.openConnect('join')),
+                        _Link(label: 'Apply as artist', accent: T.gold, onTap: () => app.openConnect('apply')),
+                        _Link(label: 'List your business', accent: T.gold, onTap: () => app.openConnect('apply')),
                       ],
                     ),
                     _Col(
@@ -118,7 +134,7 @@ class SiteFooter extends StatelessWidget {
                           onTap: () => app.setView(app.isLoggedIn ? 'subscription' : 'login'),
                         ),
                         _Link(
-                          label: 'List your business',
+                          label: 'Vendor portal',
                           accent: T.gold,
                           onTap: () => app.setView('vendor-auth'),
                         ),
@@ -137,8 +153,12 @@ class SiteFooter extends StatelessWidget {
                   children: [
                     Text('© ${DateTime.now().year} AOneGo9 — Modeling Agency & Production House',
                         style: F.mono(size: 11, color: T.dim)),
-                    Text('Showing availability in ${app.location}',
-                        style: F.mono(size: 11, color: T.dim)),
+                    Text(
+                      app.locationState.isEmpty
+                          ? 'Showing availability in ${app.location}'
+                          : 'Showing availability in ${app.location}, ${app.locationState}',
+                      style: F.mono(size: 11, color: T.dim),
+                    ),
                   ],
                 ),
               ],

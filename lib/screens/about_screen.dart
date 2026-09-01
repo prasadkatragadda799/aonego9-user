@@ -122,7 +122,7 @@ class _ModuleCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(mod['icon'] ?? '', style: const TextStyle(fontSize: 22, color: T.gold)),
+          Text(mod['icon'] ?? '', style: TextStyle(fontSize: 22, color: T.gold)),
           const SizedBox(height: 14),
           Text(mod['name'] ?? '', style: F.fraunces(size: 22, weight: FontWeight.w700, color: T.cream)),
           const SizedBox(height: 4),

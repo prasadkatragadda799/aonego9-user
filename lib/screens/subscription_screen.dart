@@ -80,7 +80,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         Container(
           height: 56,
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: const BoxDecoration(color: Color(0xF709090B), border: Border(bottom: BorderSide(color: T.bdr))),
+          decoration: BoxDecoration(color: T.chrome, border: Border(bottom: BorderSide(color: T.bdr))),
           child: Row(children: [
             const MenuBtn(),
             const SizedBox(width: 10),
@@ -240,7 +240,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 3),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('✓ ', style: TextStyle(color: T.grn, fontSize: 12, fontWeight: FontWeight.w700)),
+              Text('✓ ', style: TextStyle(color: T.grn, fontSize: 12, fontWeight: FontWeight.w700)),
               Expanded(child: Text(f.toString(), style: F.syne(size: 12, weight: FontWeight.w400, color: T.mut, height: 1.4))),
             ]),
           ),
@@ -341,7 +341,7 @@ class _PaymentDialogState extends State<_PaymentDialog> {
     final plan = widget.plan;
     return Dialog(
       backgroundColor: T.card,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: T.bdr)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: T.bdr)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Padding(

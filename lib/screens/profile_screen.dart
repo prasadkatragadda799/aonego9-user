@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
-import '../data/app_data.dart';
+import '../data/profile_extras.dart';
+import '../services/link_service.dart';
+import '../data/taxonomy.dart';
 import '../data/user_repository.dart';
 import '../data/vendor_profile_utils.dart';
 import '../state/app_state.dart';
@@ -10,6 +12,7 @@ import '../widgets/common.dart';
 import '../widgets/chrome.dart';
 import '../widgets/lead_form.dart';
 import '../widgets/model_gallery.dart';
+import '../widgets/profile_sections.dart';
 import '../widgets/scene_matrix.dart';
 
 /// Full-screen profile view (`.pview`).
@@ -36,25 +39,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late Map<String, dynamic> _mergedProfile;
   bool _detailsLoaded = false;
 
+  /// Socials, awards, past projects, brand work and mixed media — parsed once
+  /// from the profile-details payload.
+  ProfileExtras _extras = const ProfileExtras();
+
   Map<String, dynamic> get p => _mergedProfile;
   String get cat => p['cat'] as String? ?? '';
-  bool get isModel => cat == 'modelF' || cat == 'modelM';
+  Cat? get catInfo => catOf(cat);
+  bool get isModel => catInfo?.isTalent ?? false;
   bool get isVenue => cat == 'venue';
   bool get isEvent => cat == 'events';
   bool get isVideo => cat == 'video';
+
+  /// Categories that publish a kit list. Studios rent equipment out, so they
+  /// belong here alongside photographers and film crews.
+  bool get hasEquipment => cat == 'photo' || cat == 'video' || cat == 'studio';
   Color get accent => T.ac(cat);
 
   @override
   void initState() {
     super.initState();
     _mergedProfile = Map<String, dynamic>.from(widget.profile);
+    // 'Work & Brands' is new on every category: brand work, past projects and
+    // awards were the three things the profile could not show at all.
     _tabs = isModel
-        ? ['Gallery', 'Comp Card', 'Scene Availability', 'Packages', 'Reviews']
+        ? ['Gallery', 'Comp Card', 'Work & Brands', 'Scene Availability', 'Packages', 'Reviews']
         : isEvent
-            ? ['Overview', 'Portfolio', 'Packages', 'Reviews']
+            ? ['Overview', 'Portfolio', 'Work & Brands', 'Packages', 'Reviews']
             : isVenue
-                ? ['Spaces', 'Portfolio', 'Packages', 'Availability', 'Reviews']
-                : ['Portfolio', 'About', 'Equipment', 'Packages', 'Reviews'];
+                ? ['Spaces', 'Portfolio', 'Work & Brands', 'Packages', 'Availability', 'Reviews']
+                : [
+                    'Portfolio',
+                    'About',
+                    'Work & Brands',
+                    if (hasEquipment) 'Equipment',
+                    'Packages',
+                    'Reviews',
+                  ];
     _tab = _tabs.first;
     _fetchPackages();
     _fetchPortfolio();
@@ -94,6 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           _mergedProfile = VendorProfileUtils.mergeDetails(_mergedProfile, details);
           _mergedProfile['stats'] = VendorProfileUtils.buildDefaultStats(_mergedProfile);
+          _extras = ProfileExtras.from(details);
           _detailsLoaded = true;
         });
       }
@@ -166,12 +188,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _toast('Link copied — ready to share', link, '🔗');
   }
 
-  /// "Share" — same shareable link; on a real device this is where the native
-  /// share sheet (WhatsApp, etc.) opens. Copies + tracks the share either way.
+  /// Share the profile's public link.
+  ///
+  /// WhatsApp opens a real pre-filled share; every channel also copies the
+  /// link, so the action is never a dead end if the handoff is blocked.
   Future<void> _share(AppState app, String channel) async {
     final link = app.shareLink(p);
     await Clipboard.setData(ClipboardData(text: link));
     app.recordShare(p['id'] as String? ?? '');
+
+    if (channel == 'WhatsApp') {
+      final opened = await LinkService.shareOnWhatsApp('${p['name']} on AOneGo9 — $link');
+      _toast(
+        opened ? 'Opening WhatsApp' : 'Link copied',
+        opened ? link : '$link  ·  paste it anywhere',
+        opened ? '💬' : '📤',
+      );
+      return;
+    }
     _toast('$channel share ready', '$link  ·  copied to clipboard', '📤');
   }
 
@@ -218,7 +252,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ['🔗', _fmt(app.profileShares(id)), 'Shares'],
     ];
     return Container(
-      decoration: const BoxDecoration(color: T.bg, border: Border(bottom: BorderSide(color: T.bdr))),
+      decoration: BoxDecoration(color: T.bg, border: Border(bottom: BorderSide(color: T.bdr))),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1280),
@@ -262,7 +296,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.link, size: 14, color: T.gold),
+                        Icon(Icons.link, size: 14, color: T.gold),
                         const SizedBox(width: 7),
                         ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 240),
@@ -287,8 +321,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: const BoxDecoration(
-        color: Color(0xF709090B),
+      decoration: BoxDecoration(
+        color: T.chrome,
         border: Border(bottom: BorderSide(color: T.bdr)),
       ),
       child: Row(
@@ -328,7 +362,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             : Container(
                 decoration: BoxDecoration(gradient: T.gr(0)),
                 alignment: Alignment.center,
-                child: const SizedBox(
+                child: SizedBox(
                   height: 24,
                   width: 24,
                   child: CircularProgressIndicator(strokeWidth: 2, color: T.gold),
@@ -340,7 +374,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _heroCoverFallback() => Container(
-        decoration: BoxDecoration(gradient: T.gr(0)),
+        decoration: BoxDecoration(gradient: T.grPoster(0)),
         alignment: Alignment.center,
         child: Text(p['emoji'] ?? '', style: const TextStyle(fontSize: 96)),
       );
@@ -353,12 +387,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// look at, so this leads with the cover shot and the identity, exactly like
   /// the listing card the user just tapped, and defers everything else.
   Widget _pheroNarrow(AppState app) {
-    final catName = cats.firstWhere((c) => c['id'] == cat, orElse: () => {'name': ''})['name'];
+    final catName = catInfo?.name ?? '';
     final rating = (p['rating'] as num?)?.toDouble() ?? 0;
     final tagline = (p['tagline'] ?? '').toString();
 
     return Container(
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: T.bdr))),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: T.bdr))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
@@ -470,6 +504,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(width: 8),
                   _HeroChip(text: '📤 Share', onTap: () => _share(app, 'Profile')),
                 ]),
+                // Link in bio — Instagram and the rest, straight from the hero.
+                if (_extras.socials.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  SocialLinksRow(links: _extras.socials, accent: accent, onToast: _toast),
+                ],
               ],
             ),
           ),
@@ -480,14 +519,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── phero ──
   Widget _phero(AppState app) {
-    final catName = cats.firstWhere((c) => c['id'] == cat, orElse: () => {'name': ''})['name'];
+    final catName = catInfo?.name ?? '';
     final nameSize = (screenW(context) * 0.05).clamp(26.0, 52.0);
     final pad = (screenW(context) * 0.04).clamp(20.0, 42.0);
     return Container(
       constraints: BoxConstraints(minHeight: isNarrow(context) ? 220 : 280),
       decoration: BoxDecoration(
         gradient: T.gr(0),
-        border: const Border(bottom: BorderSide(color: T.bdr)),
+        border: Border(bottom: BorderSide(color: T.bdr)),
       ),
       child: Stack(
         children: [
@@ -504,14 +543,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           // gradient overlay
-          const Positioned.fill(
+          Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
-                  colors: [Color(0xFF09090B), Color(0x3309090B)],
-                  stops: [0.4, 1],
+                  colors: [T.bg, T.bg.withValues(alpha: .2)],
+                  stops: const [0.4, 1],
                 ),
               ),
             ),
@@ -566,6 +605,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _HeroChip(text: '💬 WhatsApp', onTap: () => _share(app, 'WhatsApp')),
                       _HeroChip(text: '📤 Share', onTap: () => _share(app, 'Profile')),
                     ]),
+                    // Link in bio — Instagram and the rest, straight from the hero.
+                    if (_extras.socials.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      SocialLinksRow(links: _extras.socials, accent: accent, onToast: _toast),
+                    ],
                   ],
                 ),
               ),
@@ -582,7 +626,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final narrow = screenW(context) <= 480;
     final perRow = narrow || isNarrow(context) ? 2 : 4;
     return Container(
-      decoration: const BoxDecoration(color: T.surf, border: Border(bottom: BorderSide(color: T.bdr))),
+      decoration: BoxDecoration(color: T.surf, border: Border(bottom: BorderSide(color: T.bdr))),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1280),
@@ -595,7 +639,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     width: cellW,
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
                     decoration: BoxDecoration(
-                      border: Border(right: (i % perRow != perRow - 1) ? const BorderSide(color: T.bdr) : BorderSide.none),
+                      border: Border(right: (i % perRow != perRow - 1) ? BorderSide(color: T.bdr) : BorderSide.none),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -653,7 +697,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Container(
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-            decoration: const BoxDecoration(color: T.surf, border: Border(bottom: BorderSide(color: T.bdr))),
+            decoration: BoxDecoration(color: T.surf, border: Border(bottom: BorderSide(color: T.bdr))),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -694,8 +738,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _mobBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
-      decoration: const BoxDecoration(
-        color: Color(0xF709090B),
+      decoration: BoxDecoration(
+        color: T.chrome,
         border: Border(top: BorderSide(color: T.bdr)),
       ),
       child: GestureDetector(
@@ -717,6 +761,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       case 'Gallery':
         return Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _profilePhotoGallery(),
+          _mediaGallery(),
           const BlkHeader('Portfolio Gallery'),
           if (_apiPortfolio == null)
             const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
@@ -739,12 +784,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ]));
       case 'Portfolio':
         return _genPortfolio();
+      case 'Work & Brands':
+        return _workAndBrands();
       case 'Overview':
         return _overview();
       case 'About':
         return Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const BlkHeader('About'),
-          Text(p['overview'] ?? '', style: F.syne(size: 14, weight: FontWeight.w400, color: T.mut, height: 1.75)),
+          Text(
+            VendorProfileUtils.hasText(p['overview'])
+                ? p['overview'] as String
+                : 'No bio published yet.',
+            style: F.syne(size: 14, weight: FontWeight.w400, color: T.mut, height: 1.75),
+          ),
+          if (_extras.socials.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            const BlkHeader('Find them online'),
+            SocialLinksRow(links: _extras.socials, accent: accent, onToast: _toast),
+          ],
+          if (_extras.awards.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            AwardsSection(awards: _extras.awards, accent: accent),
+          ],
         ]));
       case 'Equipment':
         return _equipment();
@@ -758,6 +819,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return _reviews();
     }
     return const SizedBox.shrink();
+  }
+
+  /// Brand work + past projects + awards.
+  ///
+  /// The brief asks for these as three separate profile features; they share
+  /// one tab because they answer one question — what has this person actually
+  /// shipped, and for whom.
+  Widget _workAndBrands() {
+    if (!_detailsLoaded) {
+      return const Blk(child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ));
+    }
+    final hasAny = _extras.brands.isNotEmpty || _extras.projects.isNotEmpty || _extras.awards.isNotEmpty;
+    if (!hasAny) {
+      return Blk(child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Text('No brand work, projects or awards listed yet.',
+            style: F.syne(size: 13, color: T.mut)),
+      ));
+    }
+    return Column(children: [
+      if (_extras.brands.isNotEmpty)
+        Blk(child: BrandWorkSection(brands: _extras.brands, accent: accent, onToast: _toast)),
+      if (_extras.projects.isNotEmpty)
+        Blk(child: ProjectsSection(projects: _extras.projects, accent: accent, onToast: _toast)),
+      if (_extras.awards.isNotEmpty)
+        Blk(child: AwardsSection(awards: _extras.awards, accent: accent)),
+    ]);
+  }
+
+  /// Mixed photo + video gallery, above the labelled portfolio grid.
+  Widget _mediaGallery() {
+    if (_extras.media.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      MediaGallerySection(media: _extras.media, accent: accent, onToast: _toast),
+      const SizedBox(height: 20),
+    ]);
   }
 
   Widget _compCard() {
@@ -791,7 +891,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.all(22),
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [T.surf, T.bg]),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [T.surf, T.bg]),
         border: Border.all(color: T.bdr),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -861,7 +961,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Container(
                 width: colW,
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: T.bdr))),
+                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: T.bdr))),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -931,83 +1031,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Center(child: Text(p['emoji'] ?? '', style: TextStyle(fontSize: emojiSize)));
   }
 
+  /// Portfolio for the non-talent categories.
+  ///
+  /// This used to be a plain grid while only models got the labelled,
+  /// shoot-type-filtered gallery. The brief asks for "portfolio by types of
+  /// shoot division" on artist profiles generally, so every category now gets
+  /// the same treatment — a photographer's book is just as worth splitting
+  /// into bridal / editorial / commercial as a model's.
   Widget _genPortfolio() {
-    final port = (_apiPortfolio ?? (p['portfolio'] as List?)?.cast<Map<String, dynamic>>() ?? []);
-    if (_apiPortfolio == null) {
+    final port = _apiPortfolio;
+    if (port == null) {
       return const Blk(child: Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
         child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
       ));
     }
-    if (port.isEmpty) {
-      return Blk(child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Text('No portfolio works yet.', style: F.syne(size: 13, color: T.mut)),
-      ));
-    }
-    final cols = screenW(context) <= 480 ? 1 : (screenW(context) <= 768 ? 2 : 3);
     return Blk(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _profilePhotoGallery(),
+      _mediaGallery(),
       const BlkHeader('Portfolio Gallery'),
-      LayoutBuilder(builder: (context, bc) {
-        const gap = 10.0;
-        final w = (bc.maxWidth - gap * (cols - 1)) / cols;
-        return Wrap(spacing: gap, runSpacing: gap, children: [
-          for (int i = 0; i < port.length; i++)
-            SizedBox(
-              width: w,
-              child: HoverFx(
-                // Was a "Full view" toast that never opened one. Photographers,
-                // videographers, venues and event profiles all land here, so
-                // four of six categories had no way to actually see a shot.
-                onTap: () => openPortfolioLightbox(
-                  context,
-                  items: port,
-                  index: i,
-                  accent: accent,
-                  onToast: _toast,
-                ),
-                builder: (h) => AspectRatio(
-                  aspectRatio: .78,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    transform: h ? (Matrix4.identity()..scaleByDouble(1.02, 1.02, 1.02, 1)) : Matrix4.identity(),
-                    transformAlignment: Alignment.center,
-                    decoration: BoxDecoration(border: Border.all(color: h ? T.gold : T.bdr), borderRadius: BorderRadius.circular(9)),
-                    clipBehavior: Clip.antiAlias,
-                    child: Stack(fit: StackFit.expand, children: [
-                      portfolioCoverImage(port[i], emojiSize: 40),
-                      Positioned(
-                        top: 9, left: 9,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(color: const Color(0xD909090B), borderRadius: BorderRadius.circular(3)),
-                          child: Text('${port[i]['label']}'.toUpperCase(), style: F.syne(size: 10, weight: FontWeight.w700, color: T.gold, letterSpacing: 1.2)),
-                        ),
-                      ),
-                      if (h)
-                        Align(
-                          alignment: Alignment.bottomLeft,
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0xE0000000)], stops: [.4, 1]),
-                            ),
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                              Text(port[i]['label'] ?? '', style: F.syne(size: 12, weight: FontWeight.w700, color: Colors.white)),
-                              const SizedBox(height: 2),
-                              Text(port[i]['sub'] ?? '', style: F.syne(size: 10, weight: FontWeight.w400, color: Colors.white.withValues(alpha: .5))),
-                            ]),
-                          ),
-                        ),
-                    ]),
-                  ),
-                ),
-              ),
-            ),
-        ]);
-      }),
+      if (port.isEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Text('No portfolio works yet.', style: F.syne(size: 13, color: T.mut)),
+        )
+      else
+        ModelGallery(items: port, accent: accent, onToast: _toast),
     ]));
   }
 
@@ -1100,7 +1149,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           for (int i = 0; i < equip.length; i++)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(border: Border(bottom: i == equip.length - 1 ? BorderSide.none : const BorderSide(color: T.bdr))),
+              decoration: BoxDecoration(border: Border(bottom: i == equip.length - 1 ? BorderSide.none : BorderSide(color: T.bdr))),
               child: Row(children: [
                 Container(
                   width: 28, height: 28,
@@ -1286,7 +1335,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 Container(
                   padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-                  decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: T.bdr))),
+                  decoration: BoxDecoration(border: Border(bottom: BorderSide(color: T.bdr))),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                     Text(pk['name'] ?? '', style: F.syne(size: 14, weight: FontWeight.w700, color: T.cream)),
                     const SizedBox(height: 4),
@@ -1508,7 +1557,7 @@ class _TabsDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      decoration: const BoxDecoration(color: T.surf, border: Border(bottom: BorderSide(color: T.bdr))),
+      decoration: BoxDecoration(color: T.surf, border: Border(bottom: BorderSide(color: T.bdr))),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1280),

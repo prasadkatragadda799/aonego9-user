@@ -54,6 +54,14 @@ class BrandLogo extends StatelessWidget {
     final full = variant == LogoVariant.full;
     // Each variant gets its own artwork; the vector wordmark is the safety net.
     final height = full ? size * 2.05 : size * 1.18;
+
+    // The master artwork bakes the neutral letters in white, which is right on
+    // the dark ground and invisible on paper — half the wordmark disappears.
+    // The text lockup below mirrors the same letter colouring and takes its
+    // neutral from the theme, so the light theme renders that instead of
+    // tinting or plating the PNG.
+    if (T.isLight) return _wordmark();
+
     return Image.asset(
       full ? logoLockupAssetPath : logoAssetPath,
       height: height,
@@ -82,11 +90,11 @@ class BrandLogo extends StatelessWidget {
     final word = Text.rich(
       TextSpan(children: [
         TextSpan(text: 'A', style: mark(T.logoAmber)),
-        TextSpan(text: 'o', style: mark(Colors.white)),
+        TextSpan(text: 'o', style: mark(T.logoNeutral)),
         TextSpan(text: 'n', style: mark(T.logoAmber)),
-        TextSpan(text: 'e', style: mark(Colors.white)),
+        TextSpan(text: 'e', style: mark(T.logoNeutral)),
         TextSpan(text: 'G', style: mark(T.logoCyan)),
-        TextSpan(text: 'o', style: mark(Colors.white)),
+        TextSpan(text: 'o', style: mark(T.logoNeutral)),
         TextSpan(
           text: '9',
           style: mark(T.logoAmber).copyWith(fontStyle: FontStyle.italic),
@@ -114,7 +122,7 @@ class BrandLogo extends StatelessWidget {
             style: F.syne(
               size: (size * 0.30).clamp(8.0, 14.0),
               weight: FontWeight.w700,
-              color: Colors.white,
+              color: T.logoNeutral,
               letterSpacing: (size * 0.17).clamp(2.0, 6.0),
             ),
             children: _taglineSpans(),

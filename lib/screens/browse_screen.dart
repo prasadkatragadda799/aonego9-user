@@ -1,21 +1,29 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-// Prefixed: this file also uses the app's own `Ticker` marquee widget.
+// Prefixed: this file also drives its own drifting rail animation.
 import 'package:flutter/scheduler.dart' as sched;
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
-import '../data/app_data.dart';
+import '../data/taxonomy.dart';
 import '../state/app_state.dart';
+import '../widgets/ad_slot.dart';
 import '../widgets/brand.dart';
 import '../widgets/chrome.dart';
 import '../widgets/common.dart';
 import '../widgets/digest_strip.dart';
-import '../widgets/ticker.dart';
+import '../widgets/market_search.dart';
+import '../widgets/updates_bar.dart';
 import '../widgets/listing_card.dart';
 import '../widgets/footer.dart';
 
-/// Browse view — ticker, nav, hero, category rail, filters, listing grid.
+/// Search moves between two homes rather than appearing in both: the nav has
+/// room for it above this width, and below it the field gets its own pinned
+/// row. Duplicating it — which an earlier pass did — meant two live search
+/// fields on a desktop, each able to disagree with the other.
+bool searchFitsInNav(BuildContext c) => screenW(c) > 900;
+
+/// Browse — updates bar, nav, hero, division rail, category rail, grid.
 class BrowseScreen extends StatelessWidget {
   const BrowseScreen({super.key});
 
@@ -23,17 +31,22 @@ class BrowseScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final accent = T.ac(app.activeCat);
-    final catInfo = cats.firstWhere((c) => c['id'] == app.activeCat, orElse: () => cats.first);
-    final hero = heroCopy[app.activeCat] ?? heroCopy['venue']!;
+    final cat = catOf(app.activeCat) ?? catalogue.first;
     final items = app.catItems;
     final w = screenW(context);
+    final narrow = isNarrow(context);
 
     return Container(
       color: T.bg,
       child: CustomScrollView(
         slivers: [
-          SliverToBoxAdapter(child: Ticker(accent: accent)),
+          SliverToBoxAdapter(child: UpdatesBar(accent: accent)),
           SliverPersistentHeader(pinned: true, delegate: _NavDelegate(app, accent, app.location, w)),
+          // Below the nav's threshold the field gets its own pinned row rather
+          // than being dropped — search is the primary way into a
+          // sixteen-category marketplace.
+          if (!searchFitsInNav(context))
+            SliverPersistentHeader(pinned: true, delegate: _SearchDelegate(accent, w)),
           SliverToBoxAdapter(
             child: Center(
               child: ConstrainedBox(
@@ -41,18 +54,22 @@ class BrowseScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _hero(context, accent, catInfo, hero),
+                    _hero(context, accent, cat),
                     const DigestStrip(),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: narrow ? 16 : 20),
+                      child: AdSlot(height: narrow ? 210 : 268),
+                    ),
+                    const SizedBox(height: 14),
                   ],
                 ),
               ),
             ),
           ),
-          // The category rail is now the ONLY category switcher — the nav used
-          // to repeat the same six links right above it. Pinned, because
-          // dropping the nav copy would otherwise leave no way to change
-          // category once you scroll past the hero.
-          SliverPersistentHeader(pinned: true, delegate: _RailDelegate(app, accent, w)),
+          // The rail is the only category switcher, so it stays pinned: two
+          // rows on desktop (division, then category), and on a phone one row
+          // with the division behind a leading pill.
+          SliverPersistentHeader(pinned: true, delegate: _RailDelegate(app, accent, w, narrow)),
           SliverToBoxAdapter(
             child: Center(
               child: ConstrainedBox(
@@ -60,7 +77,7 @@ class BrowseScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _listBar(context, app, accent, catInfo, items.length),
+                    _listBar(context, app, accent, cat, items.length),
                     _grid(context, app, accent, items, w),
                     const SizedBox(height: 72),
                   ],
@@ -74,11 +91,12 @@ class BrowseScreen extends StatelessWidget {
     );
   }
 
-  Widget _hero(BuildContext context, Color accent, Map cat, Map hero) {
+  Widget _hero(BuildContext context, Color accent, Cat cat) {
     final pad = isNarrow(context) ? 16.0 : 20.0;
     final hSize = (screenW(context) * 0.06).clamp(32.0, 64.0);
+    final division = divisionById[cat.division];
     return Padding(
-      padding: EdgeInsets.fromLTRB(pad, isNarrow(context) ? 36 : 48, pad, isNarrow(context) ? 22 : 26),
+      padding: EdgeInsets.fromLTRB(pad, isNarrow(context) ? 32 : 44, pad, isNarrow(context) ? 20 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -88,8 +106,16 @@ class BrowseScreen extends StatelessWidget {
               children: [
                 Container(width: 16, height: 1.5, color: accent),
                 const SizedBox(width: 8),
-                Text('${cat['icon']} ${cat['name']}'.toUpperCase(),
-                    style: F.syne(size: 10, weight: FontWeight.w700, color: accent, letterSpacing: 2.5)),
+                Flexible(
+                  child: Text(
+                    // Naming the division here is what makes a sixteen-category
+                    // catalogue navigable: you always know which room you're in.
+                    '${division?.icon ?? ''} ${division?.name ?? ''} · ${cat.icon} ${cat.name}'.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: F.syne(size: 10, weight: FontWeight.w700, color: accent, letterSpacing: 2.5),
+                  ),
+                ),
               ],
             ),
           ),
@@ -100,8 +126,17 @@ class BrowseScreen extends StatelessWidget {
               TextSpan(
                 style: F.fraunces(size: hSize, weight: FontWeight.w700, color: T.cream, height: 1.04, letterSpacing: -1.5),
                 children: [
-                  TextSpan(text: hero['h1']),
-                  TextSpan(text: hero['h2'], style: F.fraunces(size: hSize, weight: FontWeight.w700, color: accent, height: 1.04, letterSpacing: -1.5, fontStyle: FontStyle.italic)),
+                  TextSpan(text: cat.h1),
+                  TextSpan(
+                    text: cat.h2,
+                    style: F.fraunces(
+                        size: hSize,
+                        weight: FontWeight.w700,
+                        color: accent,
+                        height: 1.04,
+                        letterSpacing: -1.5,
+                        fontStyle: FontStyle.italic),
+                  ),
                 ],
               ),
             ),
@@ -111,7 +146,7 @@ class BrowseScreen extends StatelessWidget {
             delay: const Duration(milliseconds: 140),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 500),
-              child: Text(hero['sub'], style: F.syne(size: 15, weight: FontWeight.w400, color: T.mut, height: 1.7)),
+              child: Text(cat.sub, style: F.syne(size: 15, weight: FontWeight.w400, color: T.mut, height: 1.7)),
             ),
           ),
         ],
@@ -119,28 +154,51 @@ class BrowseScreen extends StatelessWidget {
     );
   }
 
-  Widget _listBar(BuildContext context, AppState app, Color accent, Map cat, int count) {
+  Widget _listBar(BuildContext context, AppState app, Color accent, Cat cat, int count) {
     final fs = app.filtersFor(app.activeCat);
+    final narrow = isNarrow(context);
     return Padding(
-      padding: EdgeInsets.fromLTRB(isNarrow(context) ? 16 : 20, 16, isNarrow(context) ? 16 : 20, 12),
+      padding: EdgeInsets.fromLTRB(narrow ? 16 : 20, 16, narrow ? 16 : 20, 12),
       child: Wrap(
         alignment: WrapAlignment.spaceBetween,
         crossAxisAlignment: WrapCrossAlignment.center,
         runSpacing: 10,
         spacing: 10,
         children: [
-          // Constrained so a long category + city string wraps instead of
-          // overflowing the row on a phone.
           ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: screenW(context) - (isNarrow(context) ? 32 : 40)),
-            child: Text('$count available · ${cat['name']} · 📍 ${app.location}',
-                style: F.mono(size: 11, color: T.dim)),
+            constraints: BoxConstraints(maxWidth: screenW(context) - (narrow ? 32 : 40)),
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              children: [
+                Text('$count available · ${cat.name} · 📍 ${app.location}',
+                    style: F.mono(size: 11, color: T.dim)),
+                if (app.query.isNotEmpty)
+                  HoverFx(
+                    onTap: app.clearQuery,
+                    builder: (h) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: .12),
+                        border: Border.all(color: accent.withValues(alpha: h ? .6 : .3)),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text('"${app.query}"', style: F.mono(size: 10, color: accent)),
+                        const SizedBox(width: 5),
+                        Icon(Icons.close_rounded, size: 11, color: accent),
+                      ]),
+                    ),
+                  ),
+              ],
+            ),
           ),
           Wrap(
             spacing: 5,
             runSpacing: 5,
             children: [
-              for (final f in fs) _FilterChip(label: f, active: app.filter == f, accent: accent, onTap: () => app.setFilter(f)),
+              for (final f in fs)
+                _FilterChip(label: f, active: app.filter == f, accent: accent, onTap: () => app.setFilter(f)),
             ],
           ),
         ],
@@ -151,8 +209,8 @@ class BrowseScreen extends StatelessWidget {
   Widget _grid(BuildContext context, AppState app, Color accent, List<Map<String, dynamic>> items, double w) {
     final pad = isNarrow(context) ? 16.0 : 20.0;
     if (items.isEmpty && app.listingsLoading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 80),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 80),
         child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: T.gold)),
       );
     }
@@ -165,19 +223,35 @@ class BrowseScreen extends StatelessWidget {
             children: [
               const Text('📍', style: TextStyle(fontSize: 30)),
               const SizedBox(height: 10),
-              Text('Nothing in this category in ${app.location} yet',
-                  style: F.syne(size: 14, weight: FontWeight.w600, color: T.mut)),
-              const SizedBox(height: 6),
+              Text(
+                app.filteredToNothing
+                    ? 'Nothing matches that here'
+                    : 'Nothing in this category in ${app.location} yet',
+                textAlign: TextAlign.center,
+                style: F.syne(size: 14, weight: FontWeight.w600, color: T.mut),
+              ),
+              const SizedBox(height: 8),
               Wrap(
+                alignment: WrapAlignment.center,
                 crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 4,
                 children: [
+                  // Offer to undo the filter that actually caused the blank —
+                  // telling someone to "see all India" when their search term
+                  // is what emptied the grid sends them the wrong way.
+                  if (app.query.isNotEmpty)
+                    GestureDetector(
+                      onTap: app.clearQuery,
+                      child: Text('Clear search', style: F.syne(size: 13, weight: FontWeight.w700, color: accent)),
+                    ),
+                  if (app.query.isNotEmpty) Text('·', style: F.syne(size: 13, color: T.dim)),
                   GestureDetector(
                     onTap: () => app.setLocation('All India'),
-                    child: Text('See all India  ', style: F.syne(size: 13, weight: FontWeight.w700, color: accent)),
+                    child: Text('See all India', style: F.syne(size: 13, weight: FontWeight.w700, color: accent)),
                   ),
-                  Text('·  ', style: F.syne(size: 13, weight: FontWeight.w400, color: T.dim)),
+                  Text('·', style: F.syne(size: 13, color: T.dim)),
                   GestureDetector(
-                    onTap: () => app.setView('vendor-auth'),
+                    onTap: () => app.openConnect('apply'),
                     child: Text('Add yours →', style: F.syne(size: 13, weight: FontWeight.w700, color: accent)),
                   ),
                 ],
@@ -189,7 +263,7 @@ class BrowseScreen extends StatelessWidget {
     }
     // grid-template-columns: repeat(auto-fill, minmax(275px,1fr))
     final avail = (w.clamp(0, 1280)) - pad * 2;
-    int cols = (avail / 275).floor().clamp(1, 5);
+    final cols = (avail / 275).floor().clamp(1, 5);
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: pad),
       child: LayoutBuilder(builder: (context, bc) {
@@ -235,13 +309,11 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     final narrow = isNarrow(context);
-    // Category links used to live here too, duplicating the rail immediately
-    // below. They are gone: the pinned rail is the single category switcher,
-    // and it carries live per-category counts the nav links never had.
-    final showVendorBtn = screenW(context) > 880;
+    final showVendorBtn = screenW(context) > 1080;
+    final showSearch = searchFitsInNav(context);
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xF709090B),
+      decoration: BoxDecoration(
+        color: T.chrome,
         border: Border(bottom: BorderSide(color: T.bdr)),
       ),
       child: Center(
@@ -264,12 +336,18 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                _LocationChip(app: app, compact: narrow),
-                const SizedBox(width: 8),
-                const Spacer(),
+                const SizedBox(width: 14),
+                if (showSearch)
+                  Expanded(child: MarketSearch(accent: accent))
+                else
+                  const Spacer(),
+                const SizedBox(width: 12),
                 if (showVendorBtn) ...[
                   GhostBtn(label: 'Vendor Portal', onTap: () => app.setView('vendor-auth')),
+                  const SizedBox(width: 8),
+                ],
+                if (screenW(context) > 520) ...[
+                  const ThemeCycleBtn(),
                   const SizedBox(width: 8),
                 ],
                 GhostBtn(
@@ -279,12 +357,12 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
                   onTap: () => app.setView('account'),
                   compact: narrow,
                 ),
-                if (screenW(context) > 480) ...[
+                if (screenW(context) > 620) ...[
                   const SizedBox(width: 8),
                   GoldBtn(
-                    label: 'Enquire',
+                    label: 'Apply',
                     color: accent,
-                    onTap: () => app.showToast('Browse profiles', 'Click any card to view profile + inquiry form', '👇'),
+                    onTap: () => app.openConnect('apply'),
                   ),
                 ],
               ],
@@ -301,37 +379,81 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
       old.accent != accent ||
       old.location != location ||
       old.width != width ||
+      old.app.query != app.query ||
       old.app.isLoggedIn != app.isLoggedIn;
 }
 
-/// Pinned category rail — the app's primary category switcher.
-///
-/// Replaces the six duplicate links that used to sit in the nav bar directly
-/// above it. Pinning keeps categories reachable after the hero scrolls away,
-/// which is what the nav copy was doing.
+/// Phone-only pinned search row.
+class _SearchDelegate extends SliverPersistentHeaderDelegate {
+  final Color accent;
+  final double width;
+  _SearchDelegate(this.accent, this.width);
+
+  @override
+  double get minExtent => 56;
+  @override
+  double get maxExtent => 56;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => Container(
+        decoration: BoxDecoration(
+          color: T.chrome,
+          border: Border(bottom: BorderSide(color: T.bdr)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 5, 16, 7),
+        child: MarketSearch(accent: accent),
+      );
+
+  @override
+  bool shouldRebuild(covariant _SearchDelegate old) => old.accent != accent || old.width != width;
+}
+
+/// Pinned rail — divisions on top, then the categories inside the active one.
 class _RailDelegate extends SliverPersistentHeaderDelegate {
   final AppState app;
   final Color accent;
   final double width;
-  _RailDelegate(this.app, this.accent, this.width);
+  final bool narrow;
+  _RailDelegate(this.app, this.accent, this.width, this.narrow);
+
+  double get _height => narrow ? 80 : 128;
 
   @override
-  double get minExtent => 86;
+  double get minExtent => _height;
   @override
-  double get maxExtent => 86;
+  double get maxExtent => _height;
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xF709090B),
+      decoration: BoxDecoration(
+        color: T.chrome,
         border: Border(bottom: BorderSide(color: T.bdr)),
       ),
       alignment: Alignment.center,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1280),
-          child: _CategoryRail(app: app),
+          child: narrow
+              // A phone cannot afford two sticky rows, so the division moves
+              // into a leading pill that opens a menu.
+              ? Row(
+                  children: [
+                    const SizedBox(width: 16),
+                    _DivisionPill(app: app),
+                    const SizedBox(width: 10),
+                    Expanded(child: _CategoryRail(app: app, padStart: 0)),
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(height: 44, child: _DivisionRail(app: app)),
+                    Container(height: 1, color: T.bdr),
+                    SizedBox(height: 83, child: _CategoryRail(app: app)),
+                  ],
+                ),
         ),
       ),
     );
@@ -339,10 +461,139 @@ class _RailDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _RailDelegate old) =>
-      old.app.activeCat != app.activeCat || old.accent != accent || old.width != width;
+      old.app.activeCat != app.activeCat ||
+      old.app.activeDivision != app.activeDivision ||
+      old.accent != accent ||
+      old.narrow != narrow ||
+      old.width != width;
 }
 
-/// The scrolling row of category tabs.
+/// The eight top-level divisions.
+class _DivisionRail extends StatelessWidget {
+  final AppState app;
+  const _DivisionRail({required this.app});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          for (final d in divisions) ...[
+            _DivTab(
+              division: d,
+              active: app.activeDivision == d.id,
+              onTap: () => app.switchDivision(d.id),
+            ),
+            const SizedBox(width: 6),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DivTab extends StatelessWidget {
+  final Division division;
+  final bool active;
+  final VoidCallback onTap;
+  const _DivTab({required this.division, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = T.dac(division.id);
+    final count = catsByDivision[division.id]?.length ?? 0;
+    return Tooltip(
+      message: division.blurb,
+      child: HoverFx(
+        onTap: onTap,
+        builder: (h) => AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: active ? accent.withValues(alpha: .14) : Colors.transparent,
+            border: Border(bottom: BorderSide(color: active ? accent : Colors.transparent, width: 2)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(division.icon, style: const TextStyle(fontSize: 12)),
+            const SizedBox(width: 7),
+            Text(division.name,
+                style: F.syne(
+                    size: 12.5,
+                    weight: FontWeight.w700,
+                    color: active ? accent : (h ? T.cream : T.mut))),
+            const SizedBox(width: 6),
+            Text('$count', style: F.mono(size: 9.5, color: active ? accent : T.faint)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Phone version of the division switcher.
+class _DivisionPill extends StatelessWidget {
+  final AppState app;
+  const _DivisionPill({required this.app});
+
+  @override
+  Widget build(BuildContext context) {
+    final d = divisionById[app.activeDivision] ?? divisions.first;
+    final accent = T.dac(d.id);
+    return PopupMenuButton<String>(
+      tooltip: 'Division: ${d.name}',
+      color: T.surf,
+      elevation: 8,
+      position: PopupMenuPosition.under,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: T.bdr),
+      ),
+      onSelected: app.switchDivision,
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          enabled: false,
+          height: 30,
+          child: Text('DIVISIONS',
+              style: F.syne(size: 10, weight: FontWeight.w700, color: T.dim, letterSpacing: 1.5)),
+        ),
+        for (final x in divisions)
+          PopupMenuItem(
+            value: x.id,
+            height: 42,
+            child: Row(children: [
+              Text(x.icon, style: const TextStyle(fontSize: 14)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(x.name,
+                    style: F.syne(
+                        size: 13,
+                        weight: FontWeight.w700,
+                        color: x.id == app.activeDivision ? T.dac(x.id) : T.text)),
+              ),
+              Text('${catsByDivision[x.id]?.length ?? 0}', style: F.mono(size: 10, color: T.faint)),
+            ]),
+          ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: .12),
+          border: Border.all(color: accent.withValues(alpha: .4)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(d.icon, style: const TextStyle(fontSize: 13)),
+          const SizedBox(width: 5),
+          Icon(Icons.keyboard_arrow_down, size: 15, color: T.mut),
+        ]),
+      ),
+    );
+  }
+}
+
+/// The scrolling row of category tabs for the ACTIVE division.
 ///
 /// Stateful for two reasons, both about keeping the *other* categories present
 /// in the user's mind once one is selected:
@@ -352,14 +603,15 @@ class _RailDelegate extends SliverPersistentHeaderDelegate {
 ///      footer or a deep link never leaves the rail parked somewhere unrelated.
 class _CategoryRail extends StatefulWidget {
   final AppState app;
-  const _CategoryRail({required this.app});
+  final double? padStart;
+  const _CategoryRail({required this.app, this.padStart});
   @override
   State<_CategoryRail> createState() => _CategoryRailState();
 }
 
 class _CategoryRailState extends State<_CategoryRail> with SingleTickerProviderStateMixin {
   final _sc = ScrollController();
-  final _keys = {for (final c in cats) c['id'] as String: GlobalKey()};
+  final _keys = {for (final c in catalogue) c.id: GlobalKey()};
   late String _lastCat = widget.app.activeCat;
   bool _more = false;
   bool _before = false;
@@ -369,9 +621,6 @@ class _CategoryRailState extends State<_CategoryRail> with SingleTickerProviderS
   // user having to discover that it scrolls. It ping-pongs rather than looping,
   // because a seamless loop would mean duplicating the tabs — and duplicate
   // category tabs are ambiguous to tap and break the per-tab keys.
-  // Deliberately slow: this is ambient "there is more over here" motion, not a
-  // marquee. The speed carries the calm; the end pause is kept short so the
-  // rail reads as continuously drifting rather than stopping and starting.
   static const double _driftPxPerSecond = 7;
   static const double _edgeHoldSeconds = 0.5;
 
@@ -383,14 +632,12 @@ class _CategoryRailState extends State<_CategoryRail> with SingleTickerProviderS
   bool _reduceMotion = false;
   Timer? _resumeTimer;
 
+  List<Cat> get _cats => catsByDivision[widget.app.activeDivision] ?? const [];
+
   @override
   void initState() {
     super.initState();
     _sc.addListener(_syncEdges);
-    // Deliberately no _reveal() on mount. The default category is the 4th of
-    // six, so centring it on first paint would scroll Event Venues and
-    // Photography off-screen before the user has seen the rail at all. Landing
-    // at the start shows the list in order; the edge fade advertises the rest.
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncEdges());
     _ticker = createTicker(_onTick)..start();
   }
@@ -501,7 +748,7 @@ class _CategoryRailState extends State<_CategoryRail> with SingleTickerProviderS
     // preference is switched off mid-session instead of latching off forever.
     _reduceMotion = MediaQuery.of(context).disableAnimations;
 
-    final pad = isNarrow(context) ? 16.0 : 20.0;
+    final pad = widget.padStart ?? (isNarrow(context) ? 16.0 : 20.0);
     return MouseRegion(
       // Drifting out from under a cursor that is about to click is the fastest
       // way to make this feel broken, so hovering halts it immediately.
@@ -524,16 +771,16 @@ class _CategoryRailState extends State<_CategoryRail> with SingleTickerProviderS
             SingleChildScrollView(
               controller: _sc,
               scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: pad),
+              padding: EdgeInsets.only(left: pad, right: pad),
               child: Row(
                 children: [
-                  for (final c in cats) ...[
+                  for (final c in _cats) ...[
                     _CTab(
-                      key: _keys[c['id'] as String],
+                      key: _keys[c.id],
                       cat: c,
-                      active: widget.app.activeCat == c['id'],
-                      count: widget.app.knownCategoryCount(c['id'] as String),
-                      onTap: () => widget.app.switchCat(c['id'] as String),
+                      active: widget.app.activeCat == c.id,
+                      count: widget.app.knownCategoryCount(c.id),
+                      onTap: () => widget.app.switchCat(c.id),
                     ),
                     const SizedBox(width: 10),
                   ],
@@ -571,7 +818,7 @@ class _EdgeFade extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: left ? Alignment.centerLeft : Alignment.centerRight,
                   end: left ? Alignment.centerRight : Alignment.centerLeft,
-                  colors: const [Color(0xF709090B), Color(0x0009090B)],
+                  colors: [T.chrome, T.chrome.withValues(alpha: 0)],
                 ),
               ),
             ),
@@ -581,38 +828,31 @@ class _EdgeFade extends StatelessWidget {
 }
 
 class _CTab extends StatelessWidget {
-  final Map cat;
+  final Cat cat;
   final bool active;
   final int? count; // null = not fetched yet (this category hasn't been opened this session)
   final VoidCallback onTap;
   const _CTab({super.key, required this.cat, required this.active, required this.count, required this.onTap});
+
   @override
   Widget build(BuildContext context) {
-    final accent = T.ac(cat['id']);
+    final accent = T.ac(cat.id);
     final none = count == 0;
 
-    // Every tab wears its OWN category accent, not just the selected one.
-    // Previously the five unselected tabs collapsed into identical grey, so
-    // choosing a category made the alternatives disappear — the user stopped
-    // registering that other categories existed. Now the rail always reads as
-    // six distinct, colour-coded options, and "selected" is a difference of
-    // intensity rather than the difference between colour and no colour.
+    // Every tab wears its OWN category accent, not just the selected one, so
+    // the row never flattens into grey and the alternatives stay visible.
     return HoverFx(
       onTap: onTap,
       builder: (h) => AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         decoration: BoxDecoration(
           color: active
               ? accent.withValues(alpha: .16)
               : (h ? accent.withValues(alpha: .10) : T.card),
           border: Border.all(
-            // Even at rest an unselected tab keeps a readable tint of its own
-            // accent, so the row never flattens into grey.
-            color: active
-                ? accent
-                : accent.withValues(alpha: h ? .65 : .34),
+            color: active ? accent : accent.withValues(alpha: h ? .65 : .34),
             width: active ? 1.6 : 1.2,
           ),
           borderRadius: BorderRadius.circular(10),
@@ -634,22 +874,18 @@ class _CTab extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(width: 10),
-            Text('${cat['icon']}', style: const TextStyle(fontSize: 15)),
+            const SizedBox(width: 9),
+            Text(cat.icon, style: const TextStyle(fontSize: 15)),
             const SizedBox(width: 7),
             Text(
-              cat['name'],
+              cat.name,
               style: F.syne(
                 size: 13.5,
                 weight: FontWeight.w700,
-                // Unselected labels sit at full body brightness (7.4:1), not
-                // the old muted grey — they have to stay readable to stay
-                // clickable.
                 color: active ? accent : (h ? T.cream : T.text),
               ),
             ),
-            const SizedBox(width: 10),
-            // Count as a badge rather than loose trailing digits.
+            const SizedBox(width: 9),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
@@ -661,66 +897,6 @@ class _CTab extends StatelessWidget {
                 style: F.mono(size: 10, color: none && !active ? T.dim : accent),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Location picker — switches the city the whole marketplace is filtered to.
-class _LocationChip extends StatelessWidget {
-  final AppState app;
-
-  /// On phones the city label is dropped so the nav row never overflows —
-  /// the pin + chevron still read as a picker, and the tooltip names the city.
-  final bool compact;
-  const _LocationChip({required this.app, this.compact = false});
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      tooltip: 'Location: ${app.location} — tap to change',
-      color: T.surf,
-      elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: T.bdr)),
-      position: PopupMenuPosition.under,
-      onSelected: app.setLocation,
-      itemBuilder: (_) => [
-        PopupMenuItem(
-          enabled: false,
-          height: 30,
-          child: Text('YOUR LOCATION', style: F.syne(size: 10, weight: FontWeight.w700, color: T.dim, letterSpacing: 1.5)),
-        ),
-        for (final c in AppState.cities)
-          PopupMenuItem(
-            value: c,
-            child: Row(
-              children: [
-                Icon(c == app.location ? Icons.location_on : Icons.location_on_outlined,
-                    size: 16, color: c == app.location ? T.gold : T.mut),
-                const SizedBox(width: 10),
-                Text(c, style: F.syne(size: 13, weight: FontWeight.w700, color: c == app.location ? T.cream : T.text)),
-              ],
-            ),
-          ),
-      ],
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 11, vertical: 7),
-        decoration: BoxDecoration(
-          color: T.gold.withValues(alpha: .08),
-          border: Border.all(color: T.gold.withValues(alpha: .35)),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.location_on, size: 14, color: T.gold),
-            if (!compact) ...[
-              const SizedBox(width: 6),
-              Text(app.location, style: F.syne(size: 12, weight: FontWeight.w700, color: T.gold)),
-            ],
-            const SizedBox(width: 2),
-            const Icon(Icons.keyboard_arrow_down, size: 15, color: T.gold),
           ],
         ),
       ),
