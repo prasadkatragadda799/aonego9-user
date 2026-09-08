@@ -125,8 +125,10 @@ class _NewsletterPopupState extends State<NewsletterPopup> {
                               'Castings, venues, campaigns — and the trends crews are actually booking. One email, Friday.',
                               style: F.syne(size: 13.5, weight: FontWeight.w400, color: T.mut, height: 1.65),
                             ),
-                            const SizedBox(height: 18),
-                            _Feature(issue: issue),
+                            if (issue != null) ...[
+                              const SizedBox(height: 18),
+                              _Feature(issue: issue),
+                            ],
                             const SizedBox(height: 22),
                             Text('Stay on the list',
                                 style: F.syne(size: 12, weight: FontWeight.w700, color: T.cream, letterSpacing: 0.2)),

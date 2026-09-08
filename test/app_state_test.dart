@@ -6,8 +6,8 @@ import 'package:aonego9_user/data/taxonomy.dart';
 import 'package:aonego9_user/state/app_state.dart';
 
 /// AppState's constructor kicks off network fetches. They fail in a test
-/// environment and are all caught internally, leaving the seed content in
-/// place — which is exactly the state these tests want to assert against.
+/// environment and are caught internally, leaving directory feeds empty —
+/// the honest default once seed content was removed.
 void main() {
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -103,73 +103,40 @@ void main() {
   });
 
   group('update feed', () {
-    test('carries workshops, webinars and events together', () {
+    test('starts empty when the desk has published nothing', () {
       final app = AppState();
       app.setLocation(kAllIndia);
-      final kinds = app.updateFeed.map((u) => u.kind).toSet();
-      expect(kinds, containsAll(<String>['workshop', 'webinar', 'event']));
+      expect(app.updateFeed, isEmpty);
+      expect(app.platformEvents, isEmpty);
+      expect(app.sessions, isEmpty);
+      expect(app.ads, isEmpty);
+      expect(app.team, isEmpty);
+      expect(app.academicPartners, isEmpty);
+      expect(app.brandPartners, isEmpty);
     });
 
-    test('is sorted by date', () {
+    test('is sorted by date when entries exist', () {
       final app = AppState();
       app.setLocation(kAllIndia);
       final dates = app.updateFeed.map((u) => u.date).toList();
       final sorted = [...dates]..sort();
       expect(dates, sorted);
     });
-
-    test('online sessions show regardless of the browsing city', () {
-      final app = AppState();
-      app.setLocation('Kochi');
-      final webinars = app.updateFeed.where((u) => u.kind == 'webinar');
-      expect(webinars, isNotEmpty);
-    });
-
-    test('scopes physical entries to the selected place', () {
-      final app = AppState();
-      app.setLocation('Mumbai');
-      for (final u in app.updateFeed) {
-        if (u.city.isEmpty || u.city.toLowerCase() == 'online') continue;
-        expect(
-          GeoIndex.matches(selected: 'Mumbai', listingCity: u.city),
-          isTrue,
-          reason: '${u.title} in ${u.city} leaked into a Mumbai feed',
-        );
-      }
-    });
-
-    test('a state selection widens the feed versus one city', () {
-      final app = AppState();
-      app.setLocation('Mumbai');
-      final city = app.updateFeed.length;
-      app.setLocation(kAllIndia);
-      expect(app.updateFeed.length, greaterThanOrEqualTo(city));
-    });
-
-    test('place renders city and state without repeating itself', () {
-      final app = AppState();
-      app.setLocation(kAllIndia);
-      for (final u in app.updateFeed) {
-        expect(u.place.contains(' · ') && u.place.split(' · ')[0] == u.place.split(' · ')[1], isFalse,
-            reason: 'duplicated place string: ${u.place}');
-      }
-    });
   });
 
   group('digest verticals', () {
-    test('seed issues are tagged with a real vertical', () {
+    test('starts with no published issues', () {
       final app = AppState();
-      expect(app.populatedVerticals, isNot(contains('')));
-      expect(app.populatedVerticals.length, greaterThan(1));
+      expect(app.newsletters, isEmpty);
+      expect(app.populatedVerticals, isEmpty);
+      expect(app.featuredIssue, isNull);
     });
 
-    test('filtering narrows the digest', () {
+    test('filtering an empty digest stays empty', () {
       final app = AppState();
-      final all = app.happeningIssues.length + app.trendIssues.length;
       app.setNewsVertical('fashion');
-      final narrowed = app.happeningIssues.length + app.trendIssues.length;
-      expect(narrowed, lessThan(all));
-      expect(narrowed, greaterThan(0));
+      expect(app.happeningIssues, isEmpty);
+      expect(app.trendIssues, isEmpty);
     });
   });
 }
@@ -227,11 +194,12 @@ void _placeLabelGuards() {
       expect(at(city: 'Online', state: 'Maharashtra').placeLabel, 'Online');
     });
 
-    test('no seeded session renders a duplicated place', () {
-      for (final s in seedSessions) {
-        expect(s.placeLabel.split(' · ').toSet().length, s.placeLabel.split(' · ').length,
-            reason: 'duplicated place on "${s.title}": ${s.placeLabel}');
-      }
+    test('empty seed lists stay empty (no invented sessions)', () {
+      expect(seedSessions, isEmpty);
+      expect(seedAds, isEmpty);
+      expect(seedTeam, isEmpty);
+      expect(seedAcademicPartners, isEmpty);
+      expect(seedBrandPartners, isEmpty);
     });
   });
 }

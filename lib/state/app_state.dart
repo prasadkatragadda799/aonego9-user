@@ -201,19 +201,17 @@ class AppState extends ChangeNotifier {
   /// list is a genuine "nothing here yet" — never backfilled with fake data.
   List<Map<String, dynamic>>? _apiListings;
   List<Map<String, dynamic>>? _apiTickerEvents;
-  List<NewsletterIssue> _newsletters = List.of(seedNewsletters);
-  List<Map<String, dynamic>> _platformEvents = List.of(seedEvents);
+  /// Directory feeds — API-only. Empty until the desk publishes.
+  List<NewsletterIssue> _newsletters = [];
+  List<Map<String, dynamic>> _platformEvents = [];
   final Map<String, List<String>> _apiFilters = {};
   bool listingsLoading = false;
   bool eventsLoading = false;
 
-  /// ── Directory feeds ─────────────────────────────────────────
-  /// Each falls back to its seed list when the desk has published nothing,
-  /// so no page is ever an empty wall on a fresh deployment.
-  List<AdCreative> _ads = List.of(seedAds);
-  List<Session> _sessions = List.of(seedSessions);
-  List<LogoPartner> _logoPartners = [...seedAcademicPartners, ...seedBrandPartners];
-  List<TeamMember> _team = List.of(seedTeam);
+  List<AdCreative> _ads = [];
+  List<Session> _sessions = [];
+  List<LogoPartner> _logoPartners = [];
+  List<TeamMember> _team = [];
   List<Map<String, dynamic>> _updates = const [];
 
   List<AdCreative> get ads => _ads;
@@ -252,10 +250,9 @@ class AppState extends ChangeNotifier {
   /// offers a chip that leads to an empty page.
   Set<String> get populatedVerticals =>
       {for (final n in _newsletters) n.vertical};
-  NewsletterIssue get featuredIssue {
-    final match = _newsletters.where((n) => n.id == featuredIssueId);
-    return match.isNotEmpty ? match.first : _newsletters.first;
-  }
+  /// Featured digest story when one exists; null if nothing is published.
+  NewsletterIssue? get featuredIssue =>
+      _newsletters.isEmpty ? null : _newsletters.first;
   List<Map<String, dynamic>> get platformEvents => _platformEvents;
 
   /// The notification bar's feed: every division's upcoming activity in one
@@ -370,17 +367,15 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Live + upcoming platform events. Seed content stays if the API is empty.
+  /// Live + upcoming platform events from the API. Empty list is honest.
   Future<void> fetchPlatformEvents() async {
     eventsLoading = true;
     notifyListeners();
     try {
       final raw = await _repo.events();
-      if (raw.isNotEmpty) {
-        _platformEvents = raw.map(_normaliseEvent).toList();
-      }
+      _platformEvents = raw.map(_normaliseEvent).toList();
     } catch (_) {
-      // keep seed events so the page is never a blank wall
+      _platformEvents = [];
     } finally {
       eventsLoading = false;
       notifyListeners();
@@ -403,8 +398,7 @@ class AppState extends ChangeNotifier {
     };
   }
 
-  /// Ads, sessions, partners, team and the updates feed. Each keeps its seed
-  /// list on failure or an empty response — see [_ads] and friends.
+  /// Ads, sessions, partners, team and the updates feed — API only.
   Future<void> fetchDirectory() async {
     final results = await Future.wait([
       _repo.ads(),
@@ -414,18 +408,10 @@ class AppState extends ChangeNotifier {
       _repo.updates(),
     ]);
 
-    final ads = results[0].map(AdCreative.fromJson).where((a) => a.headline.isNotEmpty).toList();
-    if (ads.isNotEmpty) _ads = ads;
-
-    final sessions = results[1].map(Session.fromJson).where((x) => x.title.isNotEmpty).toList();
-    if (sessions.isNotEmpty) _sessions = sessions;
-
-    final partners = results[2].map(LogoPartner.fromJson).where((x) => x.name.isNotEmpty).toList();
-    if (partners.isNotEmpty) _logoPartners = partners;
-
-    final team = results[3].map(TeamMember.fromJson).where((x) => x.name.isNotEmpty).toList();
-    if (team.isNotEmpty) _team = team;
-
+    _ads = results[0].map(AdCreative.fromJson).where((a) => a.headline.isNotEmpty).toList();
+    _sessions = results[1].map(Session.fromJson).where((x) => x.title.isNotEmpty).toList();
+    _logoPartners = results[2].map(LogoPartner.fromJson).where((x) => x.name.isNotEmpty).toList();
+    _team = results[3].map(TeamMember.fromJson).where((x) => x.name.isNotEmpty).toList();
     _updates = results[4];
     notifyListeners();
   }
@@ -433,13 +419,13 @@ class AppState extends ChangeNotifier {
   Future<void> fetchNewsletters() async {
     try {
       final raw = await _repo.newsletters();
-      if (raw.isEmpty) return;
       final parsed = raw.map(NewsletterIssue.fromJson).where((n) => n.title.isNotEmpty).toList();
-      if (parsed.isNotEmpty) {
-        _newsletters = parsed;
-        notifyListeners();
-      }
-    } catch (_) {}
+      _newsletters = parsed;
+      notifyListeners();
+    } catch (_) {
+      _newsletters = [];
+      notifyListeners();
+    }
   }
 
   Future<void> subscribeNewsletter({
