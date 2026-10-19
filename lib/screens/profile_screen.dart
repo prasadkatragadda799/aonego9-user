@@ -320,7 +320,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _pnav(AppState app) {
     return Container(
       height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: isNarrow(context) ? 12 : 20),
       decoration: BoxDecoration(
         color: T.chrome,
         border: Border(bottom: BorderSide(color: T.bdr)),
@@ -334,7 +334,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Expanded(
             child: Text(p['name'] ?? '',
                 maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: F.syne(size: 13, weight: FontWeight.w700, color: T.text)),
+                style: F.fraunces(size: 15, weight: FontWeight.w600, color: T.cream)),
           ),
           if (!isNarrow(context)) ...[
             _PnavBtn(label: '🔗 Copy', onTap: () => _copyLink(app)),
@@ -668,7 +668,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Padding(
           padding: EdgeInsets.fromLTRB(pad, 22, pad, 0),
           child: tablet
-              ? Column(key: _scrollKey, children: [_content(), const SizedBox(height: 14), _leadBox()])
+              // The key lives on the lead box alone: putting it on this Column too
+              // registered one GlobalKey twice and threw on every phone/tablet.
+              ? Column(children: [_content(), const SizedBox(height: 14), _leadBox()])
               : Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -737,10 +739,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _mobBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+      padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
-        color: T.chrome,
+        color: T.card,
         border: Border(top: BorderSide(color: T.bdr)),
+        boxShadow: const [BoxShadow(color: Color(0x1415161A), blurRadius: 16, offset: Offset(0, -4))],
       ),
       child: GestureDetector(
         onTap: () => Scrollable.ensureVisible(_scrollKey.currentContext ?? context,
@@ -748,8 +751,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 13),
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(8)),
-          child: Text('Send Inquiry →', style: F.syne(size: 14, weight: FontWeight.w700, color: T.bg)),
+          decoration: BoxDecoration(color: T.cream, borderRadius: BorderRadius.circular(6)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.send_rounded, size: 16, color: T.onAccent(T.cream)),
+            const SizedBox(width: 8),
+            Text('Send a Brief', style: F.syne(size: 14, weight: FontWeight.w700, color: T.onAccent(T.cream))),
+          ]),
         ),
       ),
     );

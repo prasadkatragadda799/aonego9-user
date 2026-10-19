@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
 import '../state/app_state.dart';
 import 'common.dart';
+import 'division_fx.dart';
 import 'footer.dart';
 
 void openAppDrawer(BuildContext context) {
@@ -52,7 +53,10 @@ class GhostBtn extends StatelessWidget {
             border: Border.all(color: T.gold.withValues(alpha: .3)),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: Text(label, style: F.syne(size: 12, weight: FontWeight.w700, color: T.gold)),
+          child: Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: F.syne(size: 12, weight: FontWeight.w700, color: T.gold)),
         ),
       );
 }
@@ -95,48 +99,12 @@ class PageFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
-    final pad = isNarrow(context) ? 16.0 : 20.0;
+    final narrow = isNarrow(context);
     return Container(
       color: T.bg,
       child: Column(
         children: [
-          Container(
-            height: 58,
-            decoration: BoxDecoration(
-              color: T.chrome,
-              border: Border(bottom: BorderSide(color: T.bdr)),
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1280),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: pad),
-                  child: Row(
-                    children: [
-                      const MenuBtn(),
-                      const SizedBox(width: 10),
-                      GhostBtn(
-                        label: isNarrow(context) ? '← Browse' : '← Back to Browse',
-                        onTap: app.backToBrowse,
-                        compact: isNarrow(context),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: F.syne(size: 13, weight: FontWeight.w700, color: T.text),
-                        ),
-                      ),
-                      ...actions,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+          AppTopBar(title: title, actions: actions),
           Expanded(
             child: CustomScrollView(
               slivers: [
@@ -154,13 +122,178 @@ class PageFrame extends StatelessWidget {
               ],
             ),
           ),
+          if (narrow) const AppDock(),
         ],
       ),
     );
   }
 }
 
+/// Inner-page top bar — menu, back to browse, the page title.
+///
+/// One component for every inner page (editorial pages, sign-in, vendor) so
+/// they cannot drift apart. On a phone the back control is an icon so the
+/// title keeps the width; on wider screens it is a labelled button.
+class AppTopBar extends StatelessWidget {
+  final String title;
+  final List<Widget> actions;
+  final VoidCallback? onBack;
+  const AppTopBar({super.key, required this.title, this.actions = const [], this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.read<AppState>();
+    final narrow = isNarrow(context);
+    final back = onBack ?? app.backToBrowse;
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: T.chrome,
+        border: Border(bottom: BorderSide(color: T.bdr)),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1280),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: narrow ? 12 : 20),
+            child: Row(
+              children: [
+                const MenuBtn(),
+                const SizedBox(width: 8),
+                if (narrow)
+                  Tooltip(
+                    message: 'Back to browse',
+                    child: HoverFx(
+                      onTap: back,
+                      builder: (h) => Container(
+                        width: 36,
+                        height: 36,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: h ? T.gold.withValues(alpha: .10) : Colors.transparent,
+                          border: Border.all(color: h ? T.gold.withValues(alpha: .45) : T.bdr),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.arrow_back_rounded, size: 18, color: h ? T.gold : T.mut),
+                      ),
+                    ),
+                  )
+                else
+                  GhostBtn(label: '← Back to Browse', onTap: back),
+                const SizedBox(width: 12),
+                Container(width: 6, height: 6, decoration: BoxDecoration(color: T.gold, shape: BoxShape.circle)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: F.fraunces(size: narrow ? 15 : 16, weight: FontWeight.w600, color: T.cream),
+                  ),
+                ),
+                ...actions,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Phone-only bottom dock — the same five destinations on every page, so a
+/// thumb always knows where Home, the floor, the digest, the account and the
+/// menu are. Browse passes [onHome]/[onFloor] to scroll in place; everywhere
+/// else they navigate back to browse.
+class AppDock extends StatelessWidget {
+  final VoidCallback? onHome;
+  final VoidCallback? onFloor;
+  const AppDock({super.key, this.onHome, this.onFloor});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final bottom = MediaQuery.of(context).padding.bottom;
+    final account = app.isLoggedIn
+        ? (app.currentUser?['name']?.toString().split(' ').first ?? 'Account')
+        : 'Sign in';
+    final v = app.view;
+    final onAccount = const {'account', 'login', 'subscription'}.contains(v);
+    return Container(
+      padding: EdgeInsets.only(bottom: bottom),
+      decoration: BoxDecoration(
+        color: T.card,
+        border: Border(top: BorderSide(color: T.bdr)),
+        boxShadow: const [BoxShadow(color: Color(0x1415161A), blurRadius: 16, offset: Offset(0, -4))],
+      ),
+      child: SizedBox(
+        height: 60,
+        child: Row(children: [
+          _DockItem(icon: Icons.home_outlined, label: 'Home', active: v == 'browse', onTap: onHome ?? app.backToBrowse),
+          _DockItem(icon: Icons.grid_view_rounded, label: 'Floor', onTap: onFloor ?? app.backToBrowse),
+          _DockItem(
+              icon: Icons.auto_stories_outlined,
+              label: 'Digest',
+              active: v == 'newsletter',
+              onTap: () => app.setView('newsletter')),
+          _DockItem(
+              icon: Icons.person_outline_rounded, label: account, active: onAccount, onTap: () => app.setView('account')),
+          _DockItem(icon: Icons.menu_rounded, label: 'Menu', onTap: () => openAppDrawer(context)),
+        ]),
+      ),
+    );
+  }
+}
+
+class _DockItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  const _DockItem({required this.icon, required this.label, required this.onTap, this.active = false});
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Semantics(
+          button: true,
+          selected: active,
+          label: label,
+          child: InkResponse(
+            onTap: onTap,
+            radius: 32,
+            highlightColor: Colors.transparent,
+            splashColor: T.gold.withValues(alpha: .12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: active ? T.gold.withValues(alpha: .12) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(icon, size: 21, color: active ? T.gold : T.mut),
+                ),
+                const SizedBox(height: 3),
+                Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: F.syne(
+                        size: 10.5, weight: active ? FontWeight.w700 : FontWeight.w600, color: active ? T.gold : T.mut)),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
 /// Eyebrow + display title + dek used on editorial pages.
+///
+/// Set as a banner card with the page's own ambient motif behind it (the same
+/// [DivisionFx] vocabulary as "Browse the floor"), dissolving toward the copy
+/// so text is never drawn over motion. Each page picks the motif that fits
+/// what it is about — film for events, rising steps for workshops, and so on.
 class PageIntro extends StatelessWidget {
   final String eyebrow;
   final String title;
@@ -169,40 +302,96 @@ class PageIntro extends StatelessWidget {
   /// Null means "the brand gold for the active theme" — it cannot be a
   /// default value now that gold is a theme-dependent getter.
   final Color? accent;
+
+  /// Which [DivisionFx] motif plays behind the banner.
+  final String motif;
   const PageIntro({
     super.key,
     required this.eyebrow,
     required this.title,
     required this.dek,
     this.accent,
+    this.motif = 'talent',
   });
 
   @override
   Widget build(BuildContext context) {
-    final pad = isNarrow(context) ? 16.0 : 24.0;
-    final size = (screenW(context) * 0.048).clamp(28.0, 48.0);
+    final w = screenW(context);
+    final narrow = isNarrow(context);
+    final size = narrow ? (w < 380 ? 25.0 : 28.0) : (w * 0.04).clamp(32.0, 44.0);
     final accent = this.accent ?? T.gold;
+    // No side padding: every page already insets its body, and adding more
+    // here left the banner narrower than the content under it.
     return Padding(
-      padding: EdgeInsets.fromLTRB(pad, isNarrow(context) ? 28 : 40, pad, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      padding: EdgeInsets.fromLTRB(0, narrow ? 16 : 28, 0, 8),
+      child: FadeUp(
+        offset: 14,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [accent.withValues(alpha: .12), T.card],
+            ),
+            border: Border.all(color: T.bdr),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          clipBehavior: Clip.antiAlias,
+          // Phone: the copy spans the full card, so the motif gets its own
+          // strip on top instead of running behind the text. Wider: the motif
+          // fills the card and dissolves toward the copy on the left.
+          child: Stack(
             children: [
-              Container(width: 16, height: 1.5, color: accent),
-              const SizedBox(width: 8),
-              Text(eyebrow.toUpperCase(),
-                  style: F.syne(size: 10, weight: FontWeight.w700, color: accent, letterSpacing: 2.4)),
+              if (narrow)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  height: 64,
+                  child: DivisionFx(divisionId: motif, accent: accent, intensity: 1.2, fadeToward: Alignment.bottomCenter),
+                )
+              else
+                Positioned.fill(
+                  child: DivisionFx(divisionId: motif, accent: accent, intensity: 1.1, fadeToward: Alignment.centerLeft),
+                ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(narrow ? 18 : 28, narrow ? 64 : 30, narrow ? 18 : 28, narrow ? 22 : 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(width: 18, height: 2, color: accent),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(eyebrow.toUpperCase(),
+                              maxLines: 2,
+                              style: F.syne(
+                                  size: narrow ? 9.5 : 10.5,
+                                  weight: FontWeight.w800,
+                                  color: accent,
+                                  letterSpacing: narrow ? 1.4 : 2.2)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 760),
+                      child: Text(title,
+                          style: F.fraunces(size: size, weight: FontWeight.w700, color: T.cream, height: 1.15)),
+                    ),
+                    const SizedBox(height: 10),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 600),
+                      child: Text(dek,
+                          style: F.syne(size: narrow ? 14 : 15, weight: FontWeight.w400, color: T.mut, height: 1.65)),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(title, style: F.fraunces(size: size, weight: FontWeight.w700, color: T.cream, height: 1.08, letterSpacing: -1.2)),
-          const SizedBox(height: 12),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: Text(dek, style: F.syne(size: 15, weight: FontWeight.w400, color: T.mut, height: 1.7)),
-          ),
-        ],
+        ),
       ),
     );
   }

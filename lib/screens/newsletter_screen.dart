@@ -28,6 +28,7 @@ class NewsletterScreen extends StatelessWidget {
           children: [
             const PageIntro(
               eyebrow: 'Industry news & media update',
+              motif: 'post',
               title: 'What\'s happening, and what\'s next.',
               dek: 'Fashion, film, music, modelling, production houses and industry bodies — castings, '
                   'venues and campaigns, plus the trends crews are actually booking. Submitted stories '
@@ -151,10 +152,10 @@ class _Grid extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     if (issues.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 40),
-        child: Text('Nothing in this section yet — check back Friday.',
-            style: F.syne(size: 14, weight: FontWeight.w400, color: T.mut)),
+      return const EmptyState(
+        icon: Icons.auto_stories_outlined,
+        title: 'Nothing in this section yet',
+        message: 'New stories land every Friday. Subscribe below and the next issue comes to you.',
       );
     }
     return LayoutBuilder(builder: (context, bc) {

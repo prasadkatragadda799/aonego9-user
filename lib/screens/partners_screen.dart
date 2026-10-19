@@ -54,6 +54,7 @@ class _PartnersScreenState extends State<PartnersScreen> {
           children: [
             const PageIntro(
               eyebrow: 'The room around the floor',
+              motif: 'fashion',
               title: 'Weeks, guilds, boards, houses, campuses.',
               dek: 'AOneGo9 sits next to the weeks, brands and institutions that already run this industry — '
                   'so a booking here can walk into a real call sheet.',
@@ -120,8 +121,12 @@ class _WallHeader extends StatelessWidget {
           Row(children: [
             Container(width: 16, height: 1.5, color: T.gold),
             const SizedBox(width: 9),
-            Text(eyebrow.toUpperCase(),
-                style: F.syne(size: 10, weight: FontWeight.w700, color: T.gold, letterSpacing: 2.2)),
+            Flexible(
+              child: Text(eyebrow.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: F.syne(size: 10, weight: FontWeight.w700, color: T.gold, letterSpacing: 2.2)),
+            ),
             const SizedBox(width: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -149,10 +154,10 @@ class _LogoWall extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (partners.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 30),
-        child: Text('No partners published in this division yet.',
-            style: F.syne(size: 13, weight: FontWeight.w400, color: T.mut)),
+      return const EmptyState(
+        icon: Icons.handshake_outlined,
+        title: 'No partners published here yet',
+        message: 'Partners appear on this wall once the desk has confirmed them.',
       );
     }
     return LayoutBuilder(builder: (context, bc) {

@@ -95,26 +95,31 @@ class _AdSlotState extends State<AdSlot> {
     );
   }
 
-  Future<void> _click(AppState app, AdCreative ad) async {
-    if (ad.opensProfile) {
-      // Load the real profile rather than trusting the ad's copy of it — an
-      // ad can outlive the listing it promotes.
-      try {
-        final vendor = await UserRepository().vendorProfile(ad.profileId);
-        if (!mounted) return;
-        app.openVendorById(vendor);
-        return;
-      } catch (_) {
-        if (!mounted) return;
-        app.showToast('Listing unavailable', 'That profile is no longer live', '⚠️');
-        return;
-      }
+  Future<void> _click(AppState app, AdCreative ad) => openAdCreative(context, app, ad);
+}
+
+/// Click-through for an ad creative — opens the promoted profile inside the
+/// app or the advertiser's site, never both, never a dead end. Shared by the
+/// ad slot and the spotlight reel so the two cannot behave differently.
+Future<void> openAdCreative(BuildContext context, AppState app, AdCreative ad) async {
+  if (ad.opensProfile) {
+    // Load the real profile rather than trusting the ad's copy of it — an
+    // ad can outlive the listing it promotes.
+    try {
+      final vendor = await UserRepository().vendorProfile(ad.profileId);
+      if (!context.mounted) return;
+      app.openVendorById(vendor);
+      return;
+    } catch (_) {
+      if (!context.mounted) return;
+      app.showToast('Listing unavailable', 'That profile is no longer live', '⚠️');
+      return;
     }
-    if (ad.websiteUrl.isNotEmpty) {
-      final ok = await LinkService.open(ad.websiteUrl);
-      if (!ok && mounted) {
-        app.showToast('Could not open link', ad.websiteUrl, '⚠️');
-      }
+  }
+  if (ad.websiteUrl.isNotEmpty) {
+    final ok = await LinkService.open(ad.websiteUrl);
+    if (!ok && context.mounted) {
+      app.showToast('Could not open link', ad.websiteUrl, '⚠️');
     }
   }
 }
@@ -141,9 +146,9 @@ class _AdCard extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             if (ad.isVideo && ad.videoUrl.isNotEmpty)
-              _AdVideo(url: ad.videoUrl, posterUrl: ad.imageUrl, bg: ad.bg, emoji: ad.emoji)
+              AdVideo(url: ad.videoUrl, posterUrl: ad.imageUrl, bg: ad.bg, emoji: ad.emoji)
             else
-              _AdStill(url: ad.imageUrl, bg: ad.bg, emoji: ad.emoji),
+              AdStill(url: ad.imageUrl, bg: ad.bg, emoji: ad.emoji),
 
             // Scrim so copy stays legible over any creative.
             const Positioned.fill(
@@ -268,11 +273,11 @@ class _AdCard extends StatelessWidget {
   }
 }
 
-class _AdStill extends StatelessWidget {
+class AdStill extends StatelessWidget {
   final String url;
   final int bg;
   final String emoji;
-  const _AdStill({required this.url, required this.bg, required this.emoji});
+  const AdStill({super.key, required this.url, required this.bg, required this.emoji});
 
   @override
   Widget build(BuildContext context) {
@@ -298,18 +303,18 @@ class _AdStill extends StatelessWidget {
 /// unmuted ad that interrupts whatever the visitor is listening to is the
 /// fastest way to get the tab closed. A failed initialisation falls back to
 /// the still, so a broken CDN never leaves a black rectangle on the page.
-class _AdVideo extends StatefulWidget {
+class AdVideo extends StatefulWidget {
   final String url;
   final String posterUrl;
   final int bg;
   final String emoji;
-  const _AdVideo({required this.url, required this.posterUrl, required this.bg, required this.emoji});
+  const AdVideo({super.key, required this.url, required this.posterUrl, required this.bg, required this.emoji});
 
   @override
-  State<_AdVideo> createState() => _AdVideoState();
+  State<AdVideo> createState() => _AdVideoState();
 }
 
-class _AdVideoState extends State<_AdVideo> {
+class _AdVideoState extends State<AdVideo> {
   VideoPlayerController? _controller;
   bool _failed = false;
 
@@ -352,7 +357,7 @@ class _AdVideoState extends State<_AdVideo> {
   Widget build(BuildContext context) {
     final c = _controller;
     if (_failed || c == null || !c.value.isInitialized) {
-      return _AdStill(url: widget.posterUrl, bg: widget.bg, emoji: widget.emoji);
+      return AdStill(url: widget.posterUrl, bg: widget.bg, emoji: widget.emoji);
     }
     // Cover the slot without distortion — FittedBox scales the video's own
     // aspect ratio up and lets the parent clip the overflow.

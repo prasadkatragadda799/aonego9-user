@@ -50,6 +50,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
           children: [
             const PageIntro(
               eyebrow: 'Learn from the desk',
+              motif: 'education',
               title: 'Workshops in the room. Webinars from anywhere.',
               dek: 'Comp card clinics, lighting intensives, scene protocol sessions and post-production '
                   'pipelines — hosted by the people who actually run them.',
@@ -81,25 +82,15 @@ class _SessionsScreenState extends State<SessionsScreen> {
             const SizedBox(height: 22),
 
             if (sessions.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 60),
-                child: Center(
-                  child: Column(children: [
-                    const Text('🎓', style: TextStyle(fontSize: 30)),
-                    const SizedBox(height: 10),
-                    Text('Nothing scheduled in this filter yet',
-                        style: F.syne(size: 14, weight: FontWeight.w600, color: T.mut)),
-                    const SizedBox(height: 6),
-                    HoverFx(
-                      onTap: () => setState(() {
-                        _mode = 'all';
-                        _division = 'all';
-                      }),
-                      builder: (h) => Text('Show everything →',
-                          style: F.syne(size: 13, weight: FontWeight.w700, color: h ? T.goldLight : T.gold)),
-                    ),
-                  ]),
-                ),
+              EmptyState(
+                icon: Icons.school_outlined,
+                title: 'Nothing scheduled in this filter yet',
+                message: 'Workshops and webinars from every division show up here when they open.',
+                actionLabel: 'Show everything',
+                onAction: () => setState(() {
+                  _mode = 'all';
+                  _division = 'all';
+                }),
               )
             else
               LayoutBuilder(builder: (context, bc) {
@@ -262,13 +253,18 @@ class _SessionCard extends StatelessWidget {
         child: Text(label, style: F.syne(size: 11.5, weight: FontWeight.w700, color: fg)),
       );
 
-  void _openRegister(BuildContext context, AppState app, Session s) {
-    showDialog<void>(
-      context: context,
-      barrierColor: T.scrim,
-      builder: (_) => _RegisterDialog(session: s, app: app),
-    );
-  }
+  void _openRegister(BuildContext context, AppState app, Session s) => showSessionRegister(context, app, s);
+}
+
+/// Open the seat-reservation dialog for [s] from anywhere — the sessions page
+/// and the home spotlight reel share it, so a seat booked from either lands
+/// in the same place.
+void showSessionRegister(BuildContext context, AppState app, Session s) {
+  showDialog<void>(
+    context: context,
+    barrierColor: T.scrim,
+    builder: (_) => _RegisterDialog(session: s, app: app),
+  );
 }
 
 class _RegisterDialog extends StatefulWidget {

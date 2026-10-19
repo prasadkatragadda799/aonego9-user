@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -78,11 +79,13 @@ class ApiClient {
     final refresh = await getRefreshToken();
     if (refresh == null || refresh.isEmpty) return false;
     try {
-      final res = await http.post(
-        Uri.parse('$kBaseUrl/auth/refresh'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'refresh_token': refresh}),
-      );
+      final res = await http
+          .post(
+            Uri.parse('$kBaseUrl/auth/refresh'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'refresh_token': refresh}),
+          )
+          .timeout(_postTimeout);
       if (res.statusCode != 200) return false;
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       await saveTokens(body['access_token'] as String, body['refresh_token'] as String);
@@ -92,11 +95,56 @@ class ApiClient {
     }
   }
 
-  static Future<dynamic> get(String path) async =>
-      _decode(await http.get(Uri.parse('$kBaseUrl$path'), headers: await _headers()));
+  /// Without a deadline a hung backend (a cold Render instance, a dropped
+  /// connection) left every spinner in the app turning forever. GETs get one
+  /// retry, which also rides out the cold start; POSTs are not retried
+  /// because they are not safe to repeat.
+  static const _getTimeout = Duration(seconds: 30);
+  static const _postTimeout = Duration(seconds: 45);
 
-  static Future<dynamic> post(String path, Map<String, dynamic> body, {bool auth = true}) async =>
-      _decode(await http.post(Uri.parse('$kBaseUrl$path'), headers: await _headers(auth: auth), body: jsonEncode(body)));
+  static Future<http.Response> _withAuthRetry(Future<http.Response> Function() send, {required bool auth}) async {
+    var res = await send();
+    // An expired access token used to fail every authenticated call until the
+    // user signed out and back in; refresh once and replay.
+    if (auth && res.statusCode == 401 && await _refreshAccessToken()) {
+      res = await send();
+    }
+    return res;
+  }
+
+  static Future<dynamic> get(String path) async {
+    Future<http.Response> send() async =>
+        http.get(Uri.parse('$kBaseUrl$path'), headers: await _headers()).timeout(_getTimeout);
+    try {
+      return _decode(await _withAuthRetry(send, auth: true));
+    } on TimeoutException {
+      return _decode(await _withAuthRetry(send, auth: true));
+    } on http.ClientException {
+      return _decode(await _withAuthRetry(send, auth: true));
+    }
+  }
+
+  static Future<dynamic> post(String path, Map<String, dynamic> body, {bool auth = true}) async {
+    Future<http.Response> send() async => http
+        .post(Uri.parse('$kBaseUrl$path'), headers: await _headers(auth: auth), body: jsonEncode(body))
+        .timeout(_postTimeout);
+    return _decode(await _withAuthRetry(send, auth: auth));
+  }
+
+  /// List endpoints answer either a bare array or a page envelope
+  /// (`{items|results|data: [...]}`) depending on the route. Casting straight
+  /// to `List` threw on the envelope and the screen silently showed nothing.
+  static List<Map<String, dynamic>> asList(dynamic data) {
+    final raw = data is List
+        ? data
+        : data is Map
+            ? (data['items'] ?? data['results'] ?? data['data'] ?? const [])
+            : const [];
+    return (raw is List ? raw : const [])
+        .whereType<Map>()
+        .map((m) => m.cast<String, dynamic>())
+        .toList();
+  }
 
   /// POST /api/v1/uploads/image — JSON base64 on web, multipart on mobile.
   static Future<Map<String, dynamic>> uploadImage({

@@ -173,6 +173,78 @@ class GradientArt extends StatelessWidget {
   }
 }
 
+/// Empty-state card — shown wherever a desk-fed list has nothing in it yet.
+///
+/// A bare grey sentence floating on the page read as broken; this says what
+/// will appear here, in a card that holds the space, with a way forward when
+/// there is one.
+class EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  const EmptyState({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+        decoration: BoxDecoration(
+          color: T.card,
+          border: Border.all(color: T.bdr),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: T.gold.withValues(alpha: .10), shape: BoxShape.circle),
+              child: Icon(icon, size: 24, color: T.gold),
+            ),
+            const SizedBox(height: 14),
+            Text(title,
+                textAlign: TextAlign.center,
+                style: F.fraunces(size: 17, weight: FontWeight.w600, color: T.cream)),
+            const SizedBox(height: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Text(message,
+                  textAlign: TextAlign.center,
+                  style: F.syne(size: 13, weight: FontWeight.w400, color: T.mut, height: 1.55)),
+            ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 16),
+              HoverFx(
+                onTap: onAction,
+                builder: (h) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: h ? T.gold : T.cream,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(actionLabel!,
+                      style: F.syne(size: 13, weight: FontWeight.w700, color: T.onAccent(h ? T.gold : T.cream))),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+}
+
 /// Returns a short responsive breakpoint helper.
 double screenW(BuildContext c) => MediaQuery.of(c).size.width;
 bool isNarrow(BuildContext c) => screenW(c) <= 768;

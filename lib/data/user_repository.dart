@@ -43,8 +43,7 @@ class UserRepository {
 
   // GET /api/v1/browse/categories
   Future<List<Map<String, dynamic>>> categories() async {
-    final data = await ApiClient.get('/browse/categories') as List;
-    return data.cast<Map<String, dynamic>>();
+    return ApiClient.asList(await ApiClient.get('/browse/categories'));
   }
 
   // GET /api/v1/browse/listings?category=&city=&page=&page_size=
@@ -60,14 +59,12 @@ class UserRepository {
     if (city != null) params['city'] = city;
     if (filter != null && filter.isNotEmpty) params['filter'] = filter;
     final query = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
-    final data = await ApiClient.get('/browse/listings?$query') as List;
-    return data.cast<Map<String, dynamic>>();
+    return ApiClient.asList(await ApiClient.get('/browse/listings?$query'));
   }
 
   // GET /api/v1/browse/ticker
   Future<List<Map<String, dynamic>>> tickerEvents() async {
-    final data = await ApiClient.get('/browse/ticker') as List;
-    return data.cast<Map<String, dynamic>>();
+    return ApiClient.asList(await ApiClient.get('/browse/ticker'));
   }
 
   // GET /api/v1/vendors/public/{id}
@@ -80,9 +77,10 @@ class UserRepository {
   // Returns the vendor's active packages formatted for the profile screen's
   // p['packages'] list — keys: name, price (formatted ₹), span, feats, pop.
   Future<List<Map<String, dynamic>>> vendorPackages(String vendorId) async {
-    final data = await ApiClient.get('/vendors/public/$vendorId/packages') as List;
+    final data = ApiClient.asList(await ApiClient.get('/vendors/public/$vendorId/packages'));
     return data.map((j) {
-      final price = (j['price'] as num).toDouble();
+      // A null price (draft package) used to throw and drop the whole list.
+      final price = (j['price'] as num?)?.toDouble() ?? 0;
       final priceStr = '₹${price.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
       return {
         'name': j['title'] ?? '',
@@ -98,7 +96,7 @@ class UserRepository {
 
   // GET /api/v1/vendors/public/{id}/portfolio
   Future<List<Map<String, dynamic>>> vendorPortfolio(String vendorId) async {
-    final data = await ApiClient.get('/vendors/public/$vendorId/portfolio') as List;
+    final data = ApiClient.asList(await ApiClient.get('/vendors/public/$vendorId/portfolio'));
     return data.map((j) {
       final tag = j['tag'] as String? ?? '';
       final type = (j['type'] as String? ?? '').isNotEmpty ? j['type'] as String : tag.toLowerCase();
@@ -256,29 +254,18 @@ class UserRepository {
 
   // GET /api/v1/events — live and upcoming events for the user app
   Future<List<Map<String, dynamic>>> events() async {
-    final data = await ApiClient.get('/events');
-    if (data is List) return data.cast<Map<String, dynamic>>();
-    if (data is Map && data['items'] is List) {
-      return (data['items'] as List).cast<Map<String, dynamic>>();
-    }
-    return const [];
+    return ApiClient.asList(await ApiClient.get('/events'));
   }
 
   // GET /api/v1/cms/newsletters — published digest (empty if the desk hasn't shipped this yet)
   Future<List<Map<String, dynamic>>> newsletters() async {
     try {
       final data = await ApiClient.get('/cms/newsletters');
-      if (data is List) return data.cast<Map<String, dynamic>>();
-      if (data is Map && data['items'] is List) {
-        return (data['items'] as List).cast<Map<String, dynamic>>();
-      }
+      if (data is List || data is Map) return ApiClient.asList(data);
     } catch (_) {}
     try {
       final data = await ApiClient.get('/browse/newsletters');
-      if (data is List) return data.cast<Map<String, dynamic>>();
-      if (data is Map && data['items'] is List) {
-        return (data['items'] as List).cast<Map<String, dynamic>>();
-      }
+      if (data is List || data is Map) return ApiClient.asList(data);
     } catch (_) {}
     return const [];
   }
@@ -313,16 +300,15 @@ class UserRepository {
 
   // GET /api/v1/bookings/me
   Future<List<Map<String, dynamic>>> myBookings() async {
-    final data = await ApiClient.get('/bookings/me') as Map;
-    return (data['items'] as List).cast<Map<String, dynamic>>();
+    // A bare array (no `items` envelope) used to throw a cast error here.
+    return ApiClient.asList(await ApiClient.get('/bookings/me'));
   }
 
   // ── Subscriptions ────────────────────────────────────────────
 
   // GET /api/v1/subscriptions/plans?audience=user
   Future<List<Map<String, dynamic>>> subscriptionPlans() async {
-    final data = await ApiClient.get('/subscriptions/plans?audience=user') as List;
-    return data.cast<Map<String, dynamic>>();
+    return ApiClient.asList(await ApiClient.get('/subscriptions/plans?audience=user'));
   }
 
   // GET /api/v1/subscriptions/me — null if the user has no active subscription (404)
@@ -353,8 +339,7 @@ class UserRepository {
 
   // GET /api/v1/subscriptions/requests/mine
   Future<List<Map<String, dynamic>>> mySubscriptionRequests() async {
-    final data = await ApiClient.get('/subscriptions/requests/mine') as List;
-    return data.cast<Map<String, dynamic>>();
+    return ApiClient.asList(await ApiClient.get('/subscriptions/requests/mine'));
   }
 
   // ── Directory content ─────────────────────────────────────────
@@ -367,10 +352,7 @@ class UserRepository {
     for (final path in paths) {
       try {
         final data = await ApiClient.get(path);
-        if (data is List) return data.cast<Map<String, dynamic>>();
-        if (data is Map && data['items'] is List) {
-          return (data['items'] as List).cast<Map<String, dynamic>>();
-        }
+        if (data is List || data is Map) return ApiClient.asList(data);
       } catch (_) {
         // try the next candidate path
       }

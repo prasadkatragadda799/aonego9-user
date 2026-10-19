@@ -207,7 +207,7 @@ class _MarketSearchState extends State<MarketSearch> {
               color: T.card,
               border: Border.all(color: T.bdr),
               borderRadius: BorderRadius.circular(10),
-              boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 8))],
+              boxShadow: const [BoxShadow(color: Color(0x240F172A), blurRadius: 24, offset: Offset(0, 8))],
             ),
             clipBehavior: Clip.antiAlias,
             child: ListView(
@@ -349,7 +349,9 @@ class _PlacePill extends StatelessWidget {
         ],
       ],
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10, vertical: 7),
+        // Two-line (city + state) pills get less vertical padding so they fit
+        // the search bar's height instead of overflowing it.
+        padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10, vertical: showState ? 3 : 7),
         decoration: BoxDecoration(
           color: T.gold.withValues(alpha: .08),
           border: Border.all(color: T.gold.withValues(alpha: .3)),
@@ -370,12 +372,12 @@ class _PlacePill extends StatelessWidget {
                     Text(app.location,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: F.syne(size: 12, weight: FontWeight.w700, color: T.gold)),
+                        style: F.syne(size: 12, weight: FontWeight.w700, color: T.gold, height: 1.15)),
                     if (showState)
                       Text(st,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: F.mono(size: 9, color: T.dim)),
+                          style: F.mono(size: 9, color: T.dim).copyWith(height: 1.1)),
                   ],
                 ),
               ),

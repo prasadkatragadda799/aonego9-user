@@ -21,6 +21,7 @@ class AboutScreen extends StatelessWidget {
           children: [
             const PageIntro(
               eyebrow: 'The house',
+              motif: 'spaces',
               title: 'A modeling agency that behaves like a production floor.',
               dek: 'AOneGo9 is three modules on one desk: a public marketplace, a vendor console, and a super-admin that never lets unverified work onto the floor.',
             ),
@@ -111,8 +112,10 @@ class _ModuleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Min height, not a fixed one: the fixed 220 clipped the last lines of
+    // copy at mid widths and whenever the text scale went up.
     return Container(
-      height: 220,
+      constraints: const BoxConstraints(minHeight: 220),
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
         color: T.card,
@@ -121,6 +124,7 @@ class _ModuleCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(mod['icon'] ?? '', style: TextStyle(fontSize: 22, color: T.gold)),
           const SizedBox(height: 14),
@@ -128,10 +132,8 @@ class _ModuleCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(mod['line'] ?? '', style: F.syne(size: 12, weight: FontWeight.w600, color: T.gold)),
           const SizedBox(height: 12),
-          Expanded(
-            child: Text(mod['copy'] ?? '',
-                style: F.syne(size: 13, weight: FontWeight.w400, color: T.mut, height: 1.6)),
-          ),
+          Text(mod['copy'] ?? '',
+              style: F.syne(size: 13, weight: FontWeight.w400, color: T.mut, height: 1.6)),
         ],
       ),
     );

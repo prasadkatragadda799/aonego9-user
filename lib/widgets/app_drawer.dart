@@ -4,7 +4,6 @@ import '../data/taxonomy.dart';
 import '../theme/tokens.dart';
 import '../state/app_state.dart';
 import 'brand.dart';
-import 'chrome.dart';
 import 'common.dart';
 
 /// Left-hand site panel — Newsletter, About, Partners, Events, plus account.
@@ -193,14 +192,6 @@ class AppDrawer extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Text('APPEARANCE',
-                          style: F.syne(
-                              size: 9.5, weight: FontWeight.w700, color: T.dim, letterSpacing: 1.6)),
-                    ),
-                    const ThemeToggle(),
-                    const SizedBox(height: 14),
                     HoverFx(
                       onTap: () => _go(context, app, 'newsletter'),
                       builder: (h) => Container(

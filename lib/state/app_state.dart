@@ -79,14 +79,15 @@ class AppState extends ChangeNotifier {
   /// 'system' | 'dark' | 'light'. Persisted, and defaults to following the
   /// OS so a visitor who runs their phone in light mode is not handed a dark
   /// page on first paint.
-  String themeMode = 'system';
+  ///
+  /// The client brief locks the user app to the light directory theme, so
+  /// [resolveBrightness] always answers light. The preference plumbing is kept
+  /// intact (and still persisted) so the dark palette can be re-enabled by
+  /// changing this one method.
+  String themeMode = 'light';
 
   /// Resolve the stored preference against the platform's current brightness.
-  Brightness resolveBrightness(Brightness platform) => switch (themeMode) {
-        'dark' => Brightness.dark,
-        'light' => Brightness.light,
-        _ => platform,
-      };
+  Brightness resolveBrightness(Brightness platform) => Brightness.light;
 
   Future<void> setThemeMode(String mode) async {
     if (themeMode == mode) return;
@@ -136,9 +137,12 @@ class AppState extends ChangeNotifier {
     try {
       currentUser = await _repo.myProfile();
       notifyListeners();
+    } on ApiException catch (e) {
+      // Only a rejected token means the session is over. Clearing on any
+      // error signed people out every time the backend was slow to wake.
+      if (e.statusCode == 401 || e.statusCode == 403) await _repo.logout();
     } catch (_) {
-      // stale/expired token — clear it silently
-      await _repo.logout();
+      // Network trouble — keep the token and try again next launch.
     }
   }
 
@@ -330,7 +334,13 @@ class AppState extends ChangeNotifier {
 
   /// Fetch listings from the backend and normalise each vendor map so the
   /// existing UI widgets (ListingCard, ProfileScreen) work without changes.
+  /// Bumped per request so a slow response for a category the user has
+  /// already left cannot overwrite the grid they are looking at now.
+  int _listingsToken = 0;
+
   Future<void> fetchListings() async {
+    final token = ++_listingsToken;
+    final forCat = activeCat;
     listingsLoading = true;
     notifyListeners();
     try {
@@ -344,15 +354,19 @@ class AppState extends ChangeNotifier {
         filter: filter == 'All' ? null : filter,
         pageSize: narrowsLocally || query.isNotEmpty ? 60 : 20,
       );
+      if (token != _listingsToken) return;
       _apiListings = results.map(_normaliseVendor).toList();
       // Count what is actually browsable here, not what the request returned —
       // otherwise the rail badge disagrees with the grid under it.
-      _categoryCounts[activeCat] = _scopedToLocation(_apiListings!).length;
+      _categoryCounts[forCat] = _scopedToLocation(_apiListings!).length;
     } catch (_) {
+      if (token != _listingsToken) return;
       _apiListings = [];
     } finally {
-      listingsLoading = false;
-      notifyListeners();
+      if (token == _listingsToken) {
+        listingsLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -395,6 +409,9 @@ class AppState extends ChangeNotifier {
       'blurb': e['blurb'] ?? e['description'] ?? e['subtitle'] ?? '',
       'emoji': e['emoji'] ?? '📅',
       'bg': (e['bg'] as num?)?.toInt() ?? 0,
+      'image_url': (e['image_url'] ?? e['poster_url'] ?? '').toString().trim(),
+      'video_url': (e['video_url'] ?? '').toString().trim(),
+      'register_url': (e['register_url'] ?? e['booking_url'] ?? '').toString().trim(),
     };
   }
 
@@ -830,6 +847,25 @@ class AppState extends ChangeNotifier {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Book a place at a platform event. Routed through the leads desk (the
+  /// same endpoint as contact / apply), tagged so the admin console can sort
+  /// event bookings from the rest.
+  Future<bool> bookEvent(Map<String, dynamic> event, Map<String, dynamic> payload) async {
+    final ok = await submitLead('event_booking', {
+      ...payload,
+      'event_id': '${event['id'] ?? ''}',
+      'event_title': '${event['title'] ?? ''}',
+      'event_date': '${event['date'] ?? ''}',
+      'event_city': '${event['city'] ?? ''}',
+    });
+    if (ok) {
+      showToast('Booking requested', '${event['title'] ?? 'Event'} — the desk will confirm by email', '🎟️');
+    } else {
+      showToast('Could not book', 'Try again in a moment', '⚠️');
+    }
+    return ok;
   }
 
   Future<bool> registerForSession(Session session, Map<String, dynamic> payload) async {

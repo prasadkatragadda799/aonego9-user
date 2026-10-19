@@ -45,6 +45,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
           children: [
             PageIntro(
               eyebrow: 'Talk to the desk',
+              motif: 'beauty',
               title: active.$4,
               dek: 'Everything here lands with a real person at AOneGo9. Credentials first — '
                   'the desk verifies before anything goes on the public floor.',

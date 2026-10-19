@@ -77,18 +77,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return Container(
       color: T.bg,
       child: Column(children: [
-        Container(
-          height: 56,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(color: T.chrome, border: Border(bottom: BorderSide(color: T.bdr))),
-          child: Row(children: [
-            const MenuBtn(),
-            const SizedBox(width: 10),
-            _Btn(label: '← Back to Account', onTap: () => app.setView('account')),
-            const SizedBox(width: 12),
-            Expanded(child: Text('Subscription', style: F.syne(size: 13, weight: FontWeight.w700, color: T.text))),
-          ]),
-        ),
+        AppTopBar(title: 'Subscription', onBack: () => app.setView('account')),
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
@@ -116,6 +105,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       ),
                     ),
         ),
+        if (isNarrow(context)) const AppDock(),
       ]),
     );
   }

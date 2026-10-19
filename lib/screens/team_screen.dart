@@ -40,6 +40,7 @@ class TeamScreen extends StatelessWidget {
           children: [
             const PageIntro(
               eyebrow: 'The people behind the floor',
+              motif: 'talent',
               title: 'Every listing clears a desk before it clears the door.',
               dek: 'AOneGo9 is not an automated directory. Casting, production, verification and editorial '
                   'are run by people who have worked the sets they are booking for.',

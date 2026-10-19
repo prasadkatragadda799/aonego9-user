@@ -33,7 +33,7 @@ class ToastView extends StatelessWidget {
               left: BorderSide(color: accent, width: 3),
             ),
             borderRadius: BorderRadius.circular(10),
-            boxShadow: const [BoxShadow(color: Color(0xB3000000), blurRadius: 40, offset: Offset(0, 12))],
+            boxShadow: const [BoxShadow(color: Color(0x2E0F172A), blurRadius: 32, offset: Offset(0, 10))],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

@@ -87,7 +87,7 @@ class _NewsletterPopupState extends State<NewsletterPopup> {
                         color: T.card,
                         border: Border.all(color: T.gold.withValues(alpha: .28)),
                         borderRadius: BorderRadius.circular(18),
-                        boxShadow: const [BoxShadow(color: Color(0x99000000), blurRadius: 48, offset: Offset(0, 24))],
+                        boxShadow: const [BoxShadow(color: Color(0x330F172A), blurRadius: 40, offset: Offset(0, 18))],
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: SingleChildScrollView(

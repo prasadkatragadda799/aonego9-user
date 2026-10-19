@@ -43,40 +43,42 @@ class T {
   // Light is warm paper, not clinical white: the display serif and the gold
   // both sit badly on pure #FFF, and the ground carries a slight cream bias
   // toward the brand hue so the palette reads as chosen rather than default.
-  static Color get bg => _p(const Color(0xFF09090B), const Color(0xFFFAF8F3));
-  static Color get surf => _p(const Color(0xFF101013), const Color(0xFFF2EEE4));
+  static Color get bg => _p(const Color(0xFF09090B), const Color(0xFFF7F7F4));
+  static Color get surf => _p(const Color(0xFF101013), const Color(0xFFEFEEEA));
   static Color get card => _p(const Color(0xFF17171B), const Color(0xFFFFFFFF));
-  static Color get bdr => _p(const Color(0xFF272730), const Color(0xFFE3DED1));
-  static Color get bdhi => _p(const Color(0xFF3E3E46), const Color(0xFFC6BFAD));
+  static Color get bdr => _p(const Color(0xFF272730), const Color(0xFFDAD8D0));
+  static Color get bdhi => _p(const Color(0xFF3E3E46), const Color(0xFFBDB9AD));
 
   // ── Brand ──────────────────────────────────────────────────────
   /// The immutable brand anchor. Never theme-swapped — this is the colour the
   /// logo and the other two apps are matched to. Use [gold] for UI.
   static const brandGold = Color(0xFFC9A86C);
 
-  /// Gold as a UI colour. #C9A86C is only ~2.0:1 on light paper, so the light
-  /// theme uses a deepened gold of the same hue that clears AA as body text
-  /// and still reads unmistakably as the brand.
+  /// Gold as a UI colour. #C9A86C is only ~2.0:1 on a light page, so the
+  /// light theme uses a deepened gold of the same hue that clears AA as body
+  /// text and still reads unmistakably as the AOneGo9 brand. Gold — not a
+  /// generic marketplace blue — is the one action colour, so the light build
+  /// stays recognisably ours.
   static Color get gold => _p(brandGold, const Color(0xFF7C5E21));
   static Color get goldLight => _p(const Color(0xFFE3CFA3), const Color(0xFF6B501B));
-  static Color get goldDark => _p(const Color(0xFFA8884A), const Color(0xFF664E1B));
+  static Color get goldDark => _p(const Color(0xFFA8884A), const Color(0xFF5E4718));
 
   // ── Text ramp ──────────────────────────────────────────────────
-  static Color get cream => _p(const Color(0xFFF0EBE0), const Color(0xFF16140F));
-  static Color get text => _p(const Color(0xFFE4DFD5), const Color(0xFF232019));
-  static Color get mut => _p(const Color(0xFFA8A6B0), const Color(0xFF57534A));
-  static Color get dim => _p(const Color(0xFF8A8894), const Color(0xFF6B6659));
+  static Color get cream => _p(const Color(0xFFF0EBE0), const Color(0xFF15161A));
+  static Color get text => _p(const Color(0xFFE4DFD5), const Color(0xFF25272C));
+  static Color get mut => _p(const Color(0xFFA8A6B0), const Color(0xFF4D5058));
+  static Color get dim => _p(const Color(0xFF8A8894), const Color(0xFF5E6168));
 
   /// Decorative rules and disabled glyphs only — fails AA by design, in both
   /// themes. Anything a user must read uses text/mut/dim.
-  static Color get faint => _p(const Color(0xFF5C5A66), const Color(0xFFB4AE9D));
+  static Color get faint => _p(const Color(0xFF5C5A66), const Color(0xFFADAAA0));
 
   // ── Status ─────────────────────────────────────────────────────
   // Danger comes in two weights because one colour cannot serve both jobs:
   // `red` is for FILLS and tints, `redText` for danger text on bg/surf/card.
   static Color get red => _p(const Color(0xFFBE3B3B), const Color(0xFFB33224));
   static Color get redText => _p(const Color(0xFFE88A8A), const Color(0xFF9E2A1E));
-  static Color get grn => _p(const Color(0xFF6AAB88), const Color(0xFF2C7A4F));
+  static Color get grn => _p(const Color(0xFF6AAB88), const Color(0xFF1B7A35));
 
   /// ── Literal logo colours ──────────────────────────────────────
   /// Sampled from the AOneGo9 master logo. These exist ONLY to render the
@@ -88,7 +90,7 @@ class T {
   /// The wordmark alternates amber / neutral / cyan. The neutral letters are
   /// white on the dark ground; on paper they have to be ink or half the mark
   /// disappears. Amber and cyan are literal brand colours and never move.
-  static Color get logoNeutral => _p(const Color(0xFFFFFFFF), const Color(0xFF17150F));
+  static Color get logoNeutral => _p(const Color(0xFFFFFFFF), const Color(0xFF15161A));
 
   /// Foreground for text sitting ON an accent-filled surface.
   ///
@@ -229,14 +231,18 @@ class T {
   static const posterInkMuted = Color(0xFFB8B4AC);
 
   /// Scrim over imagery, so overlaid copy stays legible on either ground.
-  static Color get scrim => _p(const Color(0xF509090B), const Color(0xF2FAF8F3));
+  static Color get scrim => _p(const Color(0xF509090B), const Color(0x9915161A));
 
   /// Translucent chrome behind pinned headers.
-  static Color get chrome => _p(const Color(0xF709090B), const Color(0xF7FAF8F3));
+  static Color get chrome => _p(const Color(0xF709090B), const Color(0xFFFFFFFF));
 }
 
 /// ─────────────────────────────────────────────
-/// TYPOGRAPHY — Fraunces (serif display), Syne (sans body), DM Mono.
+/// TYPOGRAPHY — role names kept from the original stack (Fraunces display,
+/// Syne body, DM Mono metadata) so no call site changes. The light directory
+/// build draws them as Poppins (display), Inter (body) and tabular Inter
+/// (metadata): plain, highly legible sans faces that read cleanly at small
+/// sizes on a white page.
 /// ─────────────────────────────────────────────
 class F {
   static TextStyle fraunces({
@@ -247,12 +253,16 @@ class F {
     double? letterSpacing,
     FontStyle? fontStyle,
   }) =>
-      GoogleFonts.fraunces(
+      GoogleFonts.poppins(
         fontSize: size,
         fontWeight: weight,
         color: color ?? T.cream,
-        height: height,
-        letterSpacing: letterSpacing,
+        // Call sites were tuned for Fraunces' compact serif. Poppins has tall
+        // ascenders, so the tight line-heights and negative tracking those
+        // sites ask for would make wrapped headings collide — floor and
+        // soften them here rather than at ~150 call sites.
+        height: height == null ? null : (height < 1.2 ? 1.2 : height),
+        letterSpacing: letterSpacing == null ? null : (letterSpacing < 0 ? letterSpacing * .35 : letterSpacing),
         fontStyle: fontStyle,
       );
 
@@ -263,7 +273,7 @@ class F {
     double? height,
     double? letterSpacing,
   }) =>
-      GoogleFonts.syne(
+      GoogleFonts.inter(
         fontSize: size,
         fontWeight: weight,
         color: color ?? T.text,
@@ -277,10 +287,11 @@ class F {
     Color? color,
     double? letterSpacing,
   }) =>
-      GoogleFonts.dmMono(
+      GoogleFonts.inter(
         fontSize: size,
-        fontWeight: weight,
+        fontWeight: weight == FontWeight.w400 ? FontWeight.w500 : weight,
         color: color ?? T.dim,
         letterSpacing: letterSpacing,
+        fontFeatures: const [FontFeature.tabularFigures()],
       );
 }

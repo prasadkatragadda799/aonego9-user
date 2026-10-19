@@ -307,7 +307,7 @@ class _PortCell extends StatelessWidget {
           color: T.card,
           border: Border.all(color: h ? T.gold : T.bdr),
           borderRadius: BorderRadius.circular(10),
-          boxShadow: h ? const [BoxShadow(color: Color(0x8C000000), blurRadius: 32, offset: Offset(0, 12))] : null,
+          boxShadow: h ? const [BoxShadow(color: Color(0x290F172A), blurRadius: 24, offset: Offset(0, 10))] : null,
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(

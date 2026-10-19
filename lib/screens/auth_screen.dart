@@ -7,47 +7,6 @@ import '../widgets/chrome.dart';
 import '../widgets/common.dart';
 import '../widgets/form_fields.dart';
 
-/// Shared `.pnav` bar, matching the vendor screens' header.
-class _Pnav extends StatelessWidget {
-  final String title;
-  final VoidCallback onBack;
-  const _Pnav({required this.title, required this.onBack});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: T.chrome,
-        border: Border(bottom: BorderSide(color: T.bdr)),
-      ),
-      child: Row(children: [
-        const MenuBtn(),
-        const SizedBox(width: 10),
-        _PnavBtn(label: '← Back to Browse', onTap: onBack),
-        const SizedBox(width: 12),
-        Expanded(child: Text(title, style: F.syne(size: 13, weight: FontWeight.w700, color: T.text))),
-      ]),
-    );
-  }
-}
-
-class _PnavBtn extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _PnavBtn({required this.label, required this.onTap});
-  @override
-  Widget build(BuildContext context) => HoverFx(
-        onTap: onTap,
-        builder: (h) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(border: Border.all(color: h ? T.bdhi : T.bdr), borderRadius: BorderRadius.circular(6)),
-          child: Text(label, style: F.syne(size: 12, weight: FontWeight.w600, color: h ? T.text : T.mut)),
-        ),
-      );
-}
-
 class _PubButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
@@ -141,13 +100,15 @@ class _UserAuthState extends State<UserAuth> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final narrow = isNarrow(context);
+    final inner = narrow ? 20.0 : 28.0;
     return Container(
       color: T.bg,
       child: Column(children: [
-        _Pnav(title: _register ? 'Create Account' : 'Sign In', onBack: app.backToBrowse),
+        AppTopBar(title: _register ? 'Create Account' : 'Sign In'),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 52, 20, 80),
+            padding: EdgeInsets.fromLTRB(narrow ? 16 : 20, narrow ? 20 : 52, narrow ? 16 : 20, narrow ? 32 : 80),
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 460),
@@ -158,7 +119,7 @@ class _UserAuthState extends State<UserAuth> {
                     clipBehavior: Clip.antiAlias,
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                       Container(
-                        padding: const EdgeInsets.fromLTRB(28, 28, 28, 20),
+                        padding: EdgeInsets.fromLTRB(inner, inner, inner, 20),
                         decoration: BoxDecoration(border: Border(bottom: BorderSide(color: T.bdr))),
                         child: Column(children: [
                           const BrandLogo(size: 30, variant: LogoVariant.full),
@@ -193,7 +154,7 @@ class _UserAuthState extends State<UserAuth> {
                         ]),
                       ),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
+                        padding: EdgeInsets.fromLTRB(inner, 24, inner, 24),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                           if (_register) ...[
                             Field('Full Name', Fi('Your name', controller: _name)),
@@ -243,6 +204,7 @@ class _UserAuthState extends State<UserAuth> {
             ),
           ),
         ),
+        if (narrow) const AppDock(),
       ]),
     );
   }

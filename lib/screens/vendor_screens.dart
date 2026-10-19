@@ -16,37 +16,13 @@ class VendorPortalScreen extends StatelessWidget {
       color: T.bg,
       child: Column(
         children: [
-          Container(
-            height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(
-              color: T.chrome,
-              border: Border(bottom: BorderSide(color: T.bdr)),
-            ),
-            child: Row(children: [
-              const MenuBtn(),
-              const SizedBox(width: 10),
-              HoverFx(
-                onTap: () => context.read<AppState>().setView('browse'),
-                builder: (h) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: h ? T.bdhi : T.bdr),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text('← Back to Browse', style: F.syne(size: 12, weight: FontWeight.w600, color: h ? T.text : T.mut)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Text('Vendor Console', style: F.syne(size: 13, weight: FontWeight.w700, color: T.text))),
-            ]),
-          ),
+          const AppTopBar(title: 'Vendor Console'),
           Expanded(
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: Padding(
-                  padding: const EdgeInsets.all(32),
+                  padding: EdgeInsets.all(isNarrow(context) ? 20 : 32),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -105,6 +81,7 @@ class VendorPortalScreen extends StatelessWidget {
               ),
             ),
           ),
+          if (isNarrow(context)) const AppDock(),
         ],
       ),
     );

@@ -51,26 +51,7 @@ class _AccountScreenState extends State<AccountScreen> {
     return Container(
       color: T.bg,
       child: Column(children: [
-        Container(
-          height: 58,
-          decoration: BoxDecoration(color: T.chrome, border: Border(bottom: BorderSide(color: T.bdr))),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1280),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(children: [
-                  const MenuBtn(),
-                  const SizedBox(width: 10),
-                  _Btn(label: isNarrow(context) ? '← Browse' : '← Back to Browse', onTap: app.backToBrowse),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text('My Account', style: F.syne(size: 13, weight: FontWeight.w700, color: T.text))),
-                  _Btn(label: 'Log Out', onTap: app.logoutUser),
-                ]),
-              ),
-            ),
-          ),
-        ),
+        AppTopBar(title: 'My Account', actions: [_Btn(label: 'Log Out', onTap: app.logoutUser)]),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 40, 20, 80),
@@ -117,8 +98,13 @@ class _AccountScreenState extends State<AccountScreen> {
                           child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
                         )
                       else if (_bookings!.isEmpty)
-                        Text('No bookings yet — inquiries you send become bookings once a vendor responds.',
-                            style: F.syne(size: 13, weight: FontWeight.w400, color: T.mut, height: 1.5))
+                        EmptyState(
+                          icon: Icons.inbox_outlined,
+                          title: 'No bookings yet',
+                          message: 'Briefs you send become bookings here once a vendor responds.',
+                          actionLabel: 'Browse the floor',
+                          onAction: app.backToBrowse,
+                        )
                       else
                         for (final b in _bookings!) _bookingCard(b),
                     ]),
@@ -145,6 +131,7 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ),
         ),
+        if (isNarrow(context)) const AppDock(),
       ]),
     );
   }

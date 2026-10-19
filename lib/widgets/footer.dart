@@ -62,8 +62,10 @@ class SiteFooter extends StatelessWidget {
                               decoration: BoxDecoration(color: T.grn, shape: BoxShape.circle),
                             ),
                             const SizedBox(width: 7),
-                            Text('Every listing admin-verified',
-                                style: F.syne(size: 11, weight: FontWeight.w600, color: T.grn)),
+                            Flexible(
+                              child: Text('Every listing admin-verified',
+                                  style: F.syne(size: 11, weight: FontWeight.w600, color: T.grn)),
+                            ),
                           ]),
                         ],
                       ),
