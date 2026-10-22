@@ -11,7 +11,7 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#FFFFFF">
+  <meta name="theme-color" content="#8C1D2E">
   <meta name="description" content="AOneGo9 — Modeling Agency & Production House. Browse verified models, venues, photographers, videographers and event services across India.">
 
   <!-- Social preview -->
@@ -45,13 +45,15 @@
       margin: 0;
       padding: 0;
       height: 100%;
-      background-color: #F7F7F4;
+      background-color: #FBF6EC;
       /* Matches the app's own background so there is no white flash on load. */
     }
 
     /* ── Branded boot splash ──────────────────────────────────────────
        Flutter web ships a ~2MB bundle; without this the user stares at an
-       empty page while it downloads. Removed as soon as Flutter mounts. */
+       empty page while it downloads. It stays up until Flutter has painted
+       its first frame (not merely mounted), so there is no blank gap
+       between the splash and the app. */
     #boot {
       position: fixed;
       inset: 0;
@@ -59,96 +61,180 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 26px;
-      background: #FFFFFF;
+      padding: 24px;
+      box-sizing: border-box;
+      background:
+        radial-gradient(120% 70% at 50% 0%, rgba(245,166,35,.20), transparent 60%),
+        radial-gradient(90% 60% at 50% 100%, rgba(140,29,46,.12), transparent 65%),
+        #FBF6EC;
       z-index: 9999;
-      transition: opacity .45s ease;
+      transition: opacity .5s ease, visibility .5s ease;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
-    #boot.done { opacity: 0; pointer-events: none; }
+    #boot.done { opacity: 0; visibility: hidden; pointer-events: none; }
+    #boot.done .stage { transform: scale(1.04); }
 
+    #boot .stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: transform .5s ease;
+      animation: rise .6s ease-out both;
+    }
+
+    /* Marigold ring: a slow dashed garland around a solid saffron arc. */
+    #boot .ring {
+      position: relative;
+      width: 92px;
+      height: 92px;
+      margin-bottom: 26px;
+    }
+    #boot .ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #boot .ring .garland { animation: spin 9s linear infinite; transform-origin: 50% 50%; }
+    #boot .ring .arc { animation: spin 1.2s cubic-bezier(.55,.15,.45,.85) infinite; transform-origin: 50% 50%; }
+    #boot .ring .core {
+      position: absolute;
+      inset: 26px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #FFD27A, #F5A623 55%, #C8620A);
+      box-shadow: 0 6px 18px rgba(200,98,10,.35);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+
+    /* The wordmark and tagline are separate rows with real spacing between
+       them — the tagline used to be pulled up over the letters. */
     #boot .mark {
+      display: block;
       font-size: 40px;
-      font-weight: 700;
-      letter-spacing: -1px;
-      line-height: 1;
+      font-weight: 800;
+      letter-spacing: -.5px;
+      line-height: 1.1;
+      white-space: nowrap;
     }
     #boot .mark .a  { color: #FFC400; }
-    #boot .mark .w  { color: #15161A; }
+    #boot .mark .w  { color: #1F1513; }
     #boot .mark .g  { color: #00BCE0; }
     #boot .mark .n  { color: #FFC400; font-style: italic; }
 
     #boot .tag {
-      font-size: 10px;
+      display: block;
+      margin-top: 10px;
+      font-size: 10.5px;
       font-weight: 700;
-      letter-spacing: 5px;
-      color: #15161A;
-      margin-top: -14px;
+      letter-spacing: 4px;
+      /* letter-spacing trails the last glyph; pad it back so the line centres. */
+      padding-left: 4px;
+      color: #5B4743;
+      white-space: nowrap;
     }
-    #boot .tag em { color: #FFC400; font-style: normal; }
+    #boot .tag em { color: #9E4500; font-style: normal; }
 
-    /* Indeterminate brand-gold sweep. */
     #boot .bar {
-      width: 140px;
-      height: 2px;
-      background: #E6E3DA;
+      width: 168px;
+      height: 3px;
+      margin-top: 28px;
+      background: #EADBC2;
       overflow: hidden;
-      border-radius: 2px;
+      border-radius: 3px;
     }
     #boot .bar::after {
       content: "";
       display: block;
       width: 40%;
       height: 100%;
-      background: #7C5E21;
-      animation: sweep 1.1s ease-in-out infinite;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #8C1D2E, #F5A623);
+      animation: sweep 1.15s ease-in-out infinite;
     }
-    @keyframes sweep {
-      0%   { transform: translateX(-100%); }
-      100% { transform: translateX(350%); }
+
+    #boot .msg {
+      margin-top: 14px;
+      min-height: 16px;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: #6A5652;
+      text-align: center;
+      transition: opacity .3s ease;
+    }
+
+    @keyframes sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+    @keyframes spin  { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%, 100% { transform: scale(.92); } 50% { transform: scale(1); } }
+    @keyframes rise  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    @media (max-width: 360px) {
+      #boot .mark { font-size: 34px; }
+      #boot .tag { letter-spacing: 3px; padding-left: 3px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
-      #boot .bar::after { animation: none; width: 100%; opacity: .5; }
-      #boot { transition: none; }
+      #boot .stage, #boot .ring .garland, #boot .ring .arc, #boot .ring .core { animation: none; }
+      #boot .bar::after { animation: none; width: 100%; opacity: .6; }
+      #boot, #boot .stage { transition: none; }
     }
   </style>
 </head>
 <body>
-  <div id="boot">
-    <div>
-      <div class="mark">
+  <div id="boot" role="status" aria-live="polite" aria-label="Loading AOneGo9">
+    <div class="stage">
+      <div class="ring" aria-hidden="true">
+        <svg viewBox="0 0 92 92">
+          <circle class="garland" cx="46" cy="46" r="42" fill="none" stroke="#F5A623" stroke-width="5"
+                  stroke-linecap="round" stroke-dasharray="0.1 11" opacity=".75"/>
+          <circle cx="46" cy="46" r="32" fill="none" stroke="#EADBC2" stroke-width="3"/>
+          <circle class="arc" cx="46" cy="46" r="32" fill="none" stroke="#8C1D2E" stroke-width="3"
+                  stroke-linecap="round" stroke-dasharray="52 200"/>
+        </svg>
+        <div class="core"></div>
+      </div>
+      <div class="mark" aria-hidden="true">
         <span class="a">A</span><span class="w">o</span><span class="a">n</span><span
         class="w">e</span><span class="g">G</span><span class="w">o</span><span class="n">9</span>
       </div>
-      <div class="tag">MOD<em>E</em>LING AG<em>E</em>NCY</div>
+      <div class="tag" aria-hidden="true">MOD<em>E</em>LING AG<em>E</em>NCY</div>
+      <div class="bar" aria-hidden="true"></div>
+      <div class="msg" id="boot-msg">Getting the floor ready…</div>
     </div>
-    <div class="bar"></div>
   </div>
 
   <script>
-    // Tear the splash down as soon as Flutter paints its first frame. The
-    // observer covers every renderer (flutter-view / flt-glass-pane), and the
-    // timeout is a backstop so a slow or failed boot can never trap the user
-    // behind an opaque overlay.
+    // Keep the splash up until Flutter has painted its first frame. Flutter
+    // fires `flutter-first-frame` on window for that; the DOM check covers
+    // builds that mount without it, and the long timeout is a backstop so a
+    // failed boot can never trap the user behind the overlay.
     (function () {
       var boot = document.getElementById('boot');
       if (!boot) return;
+      var msg = document.getElementById('boot-msg');
+      var lines = ['Getting the floor ready…', 'Loading talent, crews & venues…', 'Almost there…'];
+      var i = 0;
+      var ticker = setInterval(function () {
+        if (!msg || i >= lines.length - 1) return;
+        msg.style.opacity = 0;
+        setTimeout(function () { i++; msg.textContent = lines[i]; msg.style.opacity = 1; }, 300);
+      }, 2400);
       var removed = false;
       function dismiss() {
         if (removed) return;
         removed = true;
-        boot.classList.add('done');
-        setTimeout(function () { boot.remove(); }, 500);
+        clearInterval(ticker);
+        // One extra frame so the app's first paint is on screen underneath.
+        requestAnimationFrame(function () {
+          boot.classList.add('done');
+          setTimeout(function () { if (boot.parentNode) boot.parentNode.removeChild(boot); }, 600);
+        });
       }
+      window.addEventListener('flutter-first-frame', dismiss, { once: true });
+      // Fallback: the view is in the DOM and has had time to paint.
       var observer = new MutationObserver(function () {
         if (document.querySelector('flutter-view, flt-glass-pane')) {
           observer.disconnect();
-          dismiss();
+          setTimeout(dismiss, 1500);
         }
       });
       observer.observe(document.body, { childList: true, subtree: true });
-      setTimeout(function () { observer.disconnect(); dismiss(); }, 12000);
+      setTimeout(function () { observer.disconnect(); dismiss(); }, 20000);
     })();
   </script>
   <script src="flutter_bootstrap.js" async></script>

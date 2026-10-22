@@ -11,8 +11,7 @@ import '../state/app_state.dart';
 import '../widgets/brand.dart';
 import '../widgets/chrome.dart';
 import '../widgets/common.dart';
-import '../widgets/digest_strip.dart';
-import '../widgets/division_fx.dart';
+import '../widgets/home_sections.dart';
 import '../widgets/market_search.dart';
 import '../widgets/updates_bar.dart';
 import '../widgets/listing_card.dart';
@@ -42,7 +41,6 @@ class BrowseScreen extends StatefulWidget {
 class _BrowseScreenState extends State<BrowseScreen> {
   final _scroll = ScrollController();
   final _resultsKey = GlobalKey();
-  final _floorKey = GlobalKey();
 
   @override
   void dispose() {
@@ -50,17 +48,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     super.dispose();
   }
 
-  /// Tapping a tile in the category grid switches category and then brings
-  /// the results into view, under the pinned headers rather than behind them.
-  void _openCat(AppState app, String id) {
-    app.switchCat(id);
-    _scrollToResults();
-  }
-
-  void _openDivision(AppState app, String id) {
-    app.switchDivision(id);
-    _scrollToResults();
-  }
+  void _openDivision(String id) => context.read<AppState>().openResults(division: id);
 
   void _scrollToResults() => _scrollTo(_resultsKey, includeRail: true);
 
@@ -94,67 +82,72 @@ class _BrowseScreenState extends State<BrowseScreen> {
     final w = screenW(context);
     final narrow = isNarrow(context);
 
+    // Artists / Vendors dock tabs and home shortcuts ask for the results
+    // through [AppState.openResults]; each request is consumed once.
+    if (app.takeResultsRequest()) _scrollToResults();
+
     final page = CustomScrollView(
-        controller: _scroll,
-        slivers: [
-          SliverToBoxAdapter(child: UpdatesBar(accent: accent)),
-          // On a phone the brand bar scrolls away and only search stays
-          // pinned — vertical space is the scarcest thing on that screen, and
-          // the dock at the bottom carries the menu and account instead.
-          SliverPersistentHeader(pinned: !narrow, delegate: _NavDelegate(app, accent, app.location, w)),
-          // Below the nav's threshold the field gets its own pinned row rather
-          // than being dropped — search is the primary way into a
-          // sixteen-category marketplace.
-          if (!searchFitsInNav(context))
-            SliverPersistentHeader(pinned: true, delegate: _SearchDelegate(accent, w)),
-          SliverToBoxAdapter(child: _hero(context, app)),
-          SliverToBoxAdapter(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1280),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Auto-advancing spotlight: ads (video / photo), events,
-                    // workshops and digest stories, each tapping through to
-                    // its booking or detail; house posts fill it otherwise.
-                    SpotlightReel(onOpenDivision: (id) => _openDivision(app, id)),
-                    _DivisionExplorer(
-                      key: _floorKey,
-                      app: app,
-                      onPickCat: (id) => _openCat(app, id),
-                      onPickDivision: (id) => _openDivision(app, id),
-                    ),
-                    const DigestStrip(),
-                    const SizedBox(height: 8),
-                  ],
-                ),
+      controller: _scroll,
+      slivers: [
+        // The phone header carries a bell for the same feed, so the ticker
+        // band is a wide-screen extra.
+        if (!narrow) SliverToBoxAdapter(child: UpdatesBar(accent: accent)),
+        // On a phone the brand bar scrolls away and only search stays
+        // pinned — vertical space is the scarcest thing on that screen, and
+        // the dock at the bottom carries the menu and account instead.
+        SliverPersistentHeader(pinned: !narrow, delegate: _NavDelegate(app, accent, app.location, w)),
+        // Below the nav's threshold the field gets its own pinned row rather
+        // than being dropped — search is the primary way into a
+        // sixteen-category marketplace.
+        if (!searchFitsInNav(context)) SliverPersistentHeader(pinned: true, delegate: _SearchDelegate(accent, w)),
+        // Home, top to bottom as the client's sketch stacks it — pictures
+        // and tiles rather than paragraphs.
+        SliverToBoxAdapter(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1280),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  PromoStrip(app: app),
+                  // The big advertisement: video / poster creatives, events
+                  // and workshops, each tapping through to its page or site.
+                  SpotlightReel(onOpenDivision: _openDivision),
+                  ListingProfiles(app: app),
+                  QuickTiles(app: app),
+                  UpdatesFolders(app: app),
+                  ServiceProviders(app: app),
+                  ReelsCarousel(app: app),
+                  IndustryGrid(app: app),
+                  const SizedBox(height: 20),
+                ],
               ),
             ),
           ),
-          // The rail stays pinned so the category can be switched from
-          // anywhere in the results: two rows on desktop (division, then
-          // category), one row on a phone with the division behind a pill.
-          SliverPersistentHeader(pinned: true, delegate: _RailDelegate(app, accent, w, narrow)),
-          SliverToBoxAdapter(
-            child: Center(
-              child: ConstrainedBox(
-                key: _resultsKey,
-                constraints: const BoxConstraints(maxWidth: 1280),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _listBar(context, app, accent, cat, items.length),
-                    _grid(context, app, accent, items, w),
-                    const SizedBox(height: 56),
-                  ],
-                ),
+        ),
+        // The rail stays pinned so the category can be switched from
+        // anywhere in the results: two rows on desktop (division, then
+        // category), one row on a phone with the division behind a pill.
+        SliverPersistentHeader(pinned: true, delegate: _RailDelegate(app, accent, w, narrow)),
+        SliverToBoxAdapter(
+          child: Center(
+            child: ConstrainedBox(
+              key: _resultsKey,
+              constraints: const BoxConstraints(maxWidth: 1280),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _listBar(context, app, accent, cat, items.length),
+                  _grid(context, app, accent, items, w),
+                  const SizedBox(height: 56),
+                ],
               ),
             ),
           ),
-          const SliverToBoxAdapter(child: SiteFooter()),
-        ],
-      );
+        ),
+        const SliverToBoxAdapter(child: SiteFooter()),
+      ],
+    );
 
     return Container(
       color: T.bg,
@@ -168,113 +161,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
                       _scroll.animateTo(0, duration: const Duration(milliseconds: 420), curve: Curves.easeOutCubic);
                     }
                   },
-                  onFloor: () => _scrollTo(_floorKey),
                 ),
               ],
             )
           : page,
-    );
-  }
-
-  /// White hero band: headline, place, trust points.
-  Widget _hero(BuildContext context, AppState app) {
-    final w = screenW(context);
-    final narrow = isNarrow(context);
-    final pad = narrow ? 16.0 : 20.0;
-    final hSize = w < 380 ? 22.0 : (narrow ? 25.0 : (w < 1024 ? 30.0 : 34.0));
-    final place = app.location == 'All India' ? 'across India' : 'in ${app.location}';
-
-    final copy = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FadeUp(
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 22, height: 2, color: T.gold),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text('MODELING AGENCY & PRODUCTION HOUSE',
-                  style: F.syne(
-                      size: w < 380 ? 9.5 : 10.5, weight: FontWeight.w800, color: T.gold, letterSpacing: w < 380 ? 1.1 : 2)),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 12),
-        FadeUp(
-          delay: const Duration(milliseconds: 60),
-          child: Text.rich(
-            TextSpan(
-              style: F.fraunces(size: hSize, weight: FontWeight.w700, color: T.cream, height: 1.2, letterSpacing: -.4),
-              children: [
-                const TextSpan(text: 'Cast talent, book crews & find venues '),
-                TextSpan(text: place, style: TextStyle(color: T.gold)),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        FadeUp(
-          delay: const Duration(milliseconds: 120),
-          child: Text(
-            narrow
-                ? 'Read the book before you reach out.'
-                : 'Read the book before you reach out — ${catalogue.length} categories across ${divisions.length} '
-                    'divisions, from models and photographers to studios, makeup, fashion and venues.',
-            style: F.syne(size: narrow ? 14 : 14.5, weight: FontWeight.w400, color: T.mut, height: 1.6),
-          ),
-        ),
-        SizedBox(height: narrow ? 16 : 16),
-        if (narrow)
-          // Phone: three numbers in a strip read faster than a paragraph.
-          FadeUp(
-            delay: const Duration(milliseconds: 180),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: T.surf,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: IntrinsicHeight(
-                child: Row(children: [
-                  _HeroStat(value: '${divisions.length}', label: 'Divisions'),
-                  VerticalDivider(color: T.bdr, width: 1, thickness: 1),
-                  _HeroStat(value: '${catalogue.length}', label: 'Categories'),
-                  VerticalDivider(color: T.bdr, width: 1, thickness: 1),
-                  const _HeroStat(value: '✓', label: 'Desk-verified'),
-                ]),
-              ),
-            ),
-          )
-        else
-          const Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _TrustChip(icon: Icons.verified_outlined, label: 'Desk-verified profiles'),
-              _TrustChip(icon: Icons.photo_library_outlined, label: 'Full portfolios first'),
-              _TrustChip(icon: Icons.send_outlined, label: 'Brief them directly'),
-            ],
-          ),
-      ],
-    );
-
-    return Container(
-      decoration: BoxDecoration(
-        color: T.card,
-        border: Border(bottom: BorderSide(color: T.bdr)),
-      ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1280),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, narrow ? 20 : 32, pad, narrow ? 16 : 28),
-            // Ad creatives now play in the spotlight reel below, so the hero
-            // is copy only — one place for promoted content, not two. Full
-            // width so the copy stays left-aligned instead of being centred.
-            child: SizedBox(width: double.infinity, child: copy),
-          ),
-        ),
-      ),
     );
   }
 
@@ -382,9 +272,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
               const Text('📍', style: TextStyle(fontSize: 30)),
               const SizedBox(height: 10),
               Text(
-                app.filteredToNothing
-                    ? 'Nothing matches that here'
-                    : 'Nothing in this category in ${app.location} yet',
+                app.filteredToNothing ? 'Nothing matches that here' : 'Nothing in this category in ${app.location} yet',
                 textAlign: TextAlign.center,
                 style: F.syne(size: 15, weight: FontWeight.w600, color: T.text),
               ),
@@ -436,37 +324,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 }
 
-class _HeroStat extends StatelessWidget {
-  final String value;
-  final String label;
-  const _HeroStat({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(value, style: F.fraunces(size: 20, weight: FontWeight.w700, color: T.gold, height: 1.2)),
-          const SizedBox(height: 2),
-          Text(label, style: F.syne(size: 11, weight: FontWeight.w600, color: T.mut)),
-        ]),
-      );
-}
-
-class _TrustChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _TrustChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.only(right: 14),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 16, color: T.gold),
-          const SizedBox(width: 6),
-          Text(label, style: F.syne(size: 12.5, weight: FontWeight.w600, color: T.text)),
-        ]),
-      );
-}
-
 class _EmptyAction extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
@@ -487,570 +344,6 @@ class _EmptyAction extends StatelessWidget {
       );
 }
 
-/// "Browse the floor" — every category, grouped under its division.
-///
-/// Each division is a block with its own accent and its own ambient motion
-/// ([DivisionFx]) — a spotlight over Talent, film rolling under Production,
-/// a playhead over Post & Design, and so on — so the eight rooms are told
-/// apart before a word is read.
-///
-///   phone   two-up grid of compact blocks; a tap opens that division's
-///           categories in a bottom sheet
-///   wider   panels with the motion in a header band and the categories as
-///           chips underneath
-class _DivisionExplorer extends StatelessWidget {
-  final AppState app;
-  final ValueChanged<String> onPickCat;
-  final ValueChanged<String> onPickDivision;
-  const _DivisionExplorer({super.key, required this.app, required this.onPickCat, required this.onPickDivision});
-
-  @override
-  Widget build(BuildContext context) {
-    final narrow = isNarrow(context);
-    final pad = narrow ? 16.0 : 20.0;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(pad, narrow ? 22 : 30, pad, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Browse the floor',
-                        style: F.fraunces(size: narrow ? 20 : 22, weight: FontWeight.w700, color: T.cream)),
-                    const SizedBox(height: 2),
-                    Text(
-                        narrow
-                            ? 'Pick a division to see its categories'
-                            : '${divisions.length} divisions · ${catalogue.length} categories',
-                        style: F.syne(size: 12.5, weight: FontWeight.w500, color: T.dim)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          LayoutBuilder(builder: (context, bc) {
-            if (bc.maxWidth < 640) {
-              const gap = 10.0;
-              final cardW = (bc.maxWidth - gap) / 2;
-              return Wrap(
-                spacing: gap,
-                runSpacing: gap,
-                children: [
-                  for (var i = 0; i < divisions.length; i++)
-                    SizedBox(
-                      width: cardW,
-                      child: FadeUp(
-                        delay: Duration(milliseconds: 40 * i),
-                        offset: 12,
-                        child: _DivisionBlock(
-                          division: divisions[i],
-                          active: app.activeDivision == divisions[i].id,
-                          onTap: () => _openSheet(context, divisions[i]),
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            }
-            final cols = bc.maxWidth >= 1080 ? 4 : (bc.maxWidth >= 760 ? 3 : 2);
-            const gap = 14.0;
-            final cardW = (bc.maxWidth - gap * (cols - 1)) / cols;
-            return Wrap(
-              spacing: gap,
-              runSpacing: gap,
-              children: [
-                for (var i = 0; i < divisions.length; i++)
-                  SizedBox(
-                    width: cardW,
-                    child: FadeUp(
-                      delay: Duration(milliseconds: 50 * i),
-                      offset: 14,
-                      child: _DivisionPanel(
-                        division: divisions[i],
-                        app: app,
-                        onPickCat: onPickCat,
-                        onPickDivision: onPickDivision,
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  void _openSheet(BuildContext context, Division d) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: T.card,
-      barrierColor: T.scrim,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
-      clipBehavior: Clip.antiAlias,
-      builder: (sheetCtx) => _DivisionSheet(
-        division: d,
-        app: app,
-        onPickCat: (id) {
-          Navigator.of(sheetCtx).pop();
-          onPickCat(id);
-        },
-        onPickDivision: (id) {
-          Navigator.of(sheetCtx).pop();
-          onPickDivision(id);
-        },
-      ),
-    );
-  }
-}
-
-/// Phone block: motion behind, icon, name, how many categories inside.
-class _DivisionBlock extends StatefulWidget {
-  final Division division;
-  final bool active;
-  final VoidCallback onTap;
-  const _DivisionBlock({required this.division, required this.active, required this.onTap});
-
-  @override
-  State<_DivisionBlock> createState() => _DivisionBlockState();
-}
-
-class _DivisionBlockState extends State<_DivisionBlock> {
-  bool _down = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final d = widget.division;
-    final accent = T.dac(d.id);
-    final count = catsByDivision[d.id]?.length ?? 0;
-    return Semantics(
-      button: true,
-      label: '${d.name}, $count categories',
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _down = true),
-        onTapCancel: () => setState(() => _down = false),
-        onTapUp: (_) => setState(() => _down = false),
-        onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _down ? .96 : 1,
-          duration: const Duration(milliseconds: 120),
-          child: Container(
-            height: 128,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [accent.withValues(alpha: .10), T.card],
-              ),
-              border: Border.all(color: widget.active ? accent : accent.withValues(alpha: .22), width: widget.active ? 1.5 : 1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: DivisionFx(
-                      divisionId: d.id, accent: accent, intensity: _down ? 1.5 : 1, fadeToward: Alignment.bottomCenter),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: T.card,
-                            shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(color: accent.withValues(alpha: .18), blurRadius: 10, offset: const Offset(0, 3))],
-                          ),
-                          child: Text(d.icon, style: const TextStyle(fontSize: 17)),
-                        ),
-                        const Spacer(),
-                        if (widget.active)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(3)),
-                            child: Text('OPEN',
-                                style: F.syne(size: 8.5, weight: FontWeight.w800, color: T.onAccent(accent), letterSpacing: 1)),
-                          ),
-                      ]),
-                      const Spacer(),
-                      Text(d.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: F.fraunces(size: 14.5, weight: FontWeight.w600, color: T.cream, height: 1.2)),
-                      const SizedBox(height: 2),
-                      Row(children: [
-                        // Flexible: on a 320px phone with large system text
-                        // the count and arrow did not fit side by side.
-                        Expanded(
-                          child: Text('$count ${count == 1 ? 'category' : 'categories'}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: F.syne(size: 11.5, weight: FontWeight.w600, color: accent)),
-                        ),
-                        Icon(Icons.arrow_forward_rounded, size: 15, color: accent),
-                      ]),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Bottom sheet listing one division's categories as large tap rows.
-class _DivisionSheet extends StatelessWidget {
-  final Division division;
-  final AppState app;
-  final ValueChanged<String> onPickCat;
-  final ValueChanged<String> onPickDivision;
-  const _DivisionSheet({required this.division, required this.app, required this.onPickCat, required this.onPickDivision});
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = T.dac(division.id);
-    final cats = catsByDivision[division.id] ?? const <Cat>[];
-    final maxH = MediaQuery.of(context).size.height * .82;
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: maxH),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              height: 124,
-              child: Stack(children: [
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [accent.withValues(alpha: .16), T.card],
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: DivisionFx(
-                      divisionId: division.id, accent: accent, intensity: 1.3, fadeToward: Alignment.bottomLeft),
-                ),
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: Container(
-                    margin: const EdgeInsets.only(top: 8),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(color: T.bdhi, borderRadius: BorderRadius.circular(2)),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 26, 12, 14),
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(color: T.card, shape: BoxShape.circle, boxShadow: [
-                        BoxShadow(color: accent.withValues(alpha: .22), blurRadius: 14, offset: const Offset(0, 4)),
-                      ]),
-                      child: Text(division.icon, style: const TextStyle(fontSize: 22)),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(division.name, style: F.fraunces(size: 20, weight: FontWeight.w700, color: T.cream)),
-                          Text(division.blurb,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: F.syne(size: 12.5, weight: FontWeight.w400, color: T.mut, height: 1.4)),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Close',
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: Icon(Icons.close_rounded, color: T.mut),
-                    ),
-                  ]),
-                ),
-              ]),
-            ),
-            Container(height: 1, color: T.bdr),
-            for (final c in cats)
-              _SheetRow(
-                cat: c,
-                active: app.activeCat == c.id,
-                count: app.knownCategoryCount(c.id),
-                onTap: () => onPickCat(c.id),
-              ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.of(context).padding.bottom),
-              child: SizedBox(
-                height: 48,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: T.cream,
-                    foregroundColor: T.onAccent(T.cream),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                  ),
-                  onPressed: () => onPickDivision(division.id),
-                  child: Text('Open ${division.name}', style: F.syne(size: 14, weight: FontWeight.w700, color: T.onAccent(T.cream))),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SheetRow extends StatelessWidget {
-  final Cat cat;
-  final bool active;
-  final int? count;
-  final VoidCallback onTap;
-  const _SheetRow({required this.cat, required this.active, required this.count, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = T.ac(cat.id);
-    return Material(
-      color: active ? accent.withValues(alpha: .07) : Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        splashColor: accent.withValues(alpha: .12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: T.bdr))),
-          child: Row(children: [
-            Container(
-              width: 42,
-              height: 42,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: accent.withValues(alpha: .10), borderRadius: BorderRadius.circular(8)),
-              child: Text(cat.icon, style: const TextStyle(fontSize: 20)),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(cat.name, style: F.syne(size: 15, weight: FontWeight.w700, color: active ? accent : T.cream)),
-                if (count != null)
-                  Text('$count listed', style: F.syne(size: 12, weight: FontWeight.w500, color: T.dim)),
-              ]),
-            ),
-            if (active)
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: Text('Viewing', style: F.syne(size: 11.5, weight: FontWeight.w700, color: accent)),
-              ),
-            Icon(Icons.chevron_right_rounded, color: active ? accent : T.faint),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
-/// Tablet / desktop panel: animated header band, then category chips.
-class _DivisionPanel extends StatefulWidget {
-  final Division division;
-  final AppState app;
-  final ValueChanged<String> onPickCat;
-  final ValueChanged<String> onPickDivision;
-  const _DivisionPanel({required this.division, required this.app, required this.onPickCat, required this.onPickDivision});
-
-  @override
-  State<_DivisionPanel> createState() => _DivisionPanelState();
-}
-
-class _DivisionPanelState extends State<_DivisionPanel> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final division = widget.division;
-    final app = widget.app;
-    final accent = T.dac(division.id);
-    final cats = catsByDivision[division.id] ?? const <Cat>[];
-    final activeHere = app.activeDivision == division.id;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        constraints: const BoxConstraints(minHeight: 208),
-        transform: Matrix4.translationValues(0, _hover ? -3 : 0, 0),
-        decoration: BoxDecoration(
-          color: T.card,
-          border: Border.all(color: (activeHere || _hover) ? accent.withValues(alpha: .55) : T.bdr),
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: accent.withValues(alpha: _hover ? .16 : 0),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            HoverFx(
-              onTap: () => widget.onPickDivision(division.id),
-              builder: (h) => SizedBox(
-                height: 104,
-                child: Stack(children: [
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [accent.withValues(alpha: .12), T.card],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: DivisionFx(
-                        divisionId: division.id,
-                        accent: accent,
-                        intensity: _hover ? 1.6 : 1,
-                        fadeToward: Alignment.topLeft),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 12, 12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(color: T.card, shape: BoxShape.circle, boxShadow: [
-                            BoxShadow(color: accent.withValues(alpha: .2), blurRadius: 10, offset: const Offset(0, 3)),
-                          ]),
-                          child: Text(division.icon, style: const TextStyle(fontSize: 18)),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(division.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: F.fraunces(size: 15.5, weight: FontWeight.w600, color: h ? accent : T.cream)),
-                              const SizedBox(height: 2),
-                              Text(division.blurb,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: F.syne(size: 11.5, weight: FontWeight.w400, color: T.mut, height: 1.35)),
-                            ],
-                          ),
-                        ),
-                        AnimatedSlide(
-                          duration: const Duration(milliseconds: 180),
-                          offset: Offset(h ? .25 : 0, 0),
-                          child: Icon(Icons.arrow_forward_rounded, size: 16, color: h ? accent : T.faint),
-                        ),
-                      ],
-                    ),
-                  ),
-                ]),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final c in cats)
-                    _CatChip(
-                      cat: c,
-                      active: app.activeCat == c.id,
-                      count: app.knownCategoryCount(c.id),
-                      onTap: () => widget.onPickCat(c.id),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CatChip extends StatelessWidget {
-  final Cat cat;
-  final bool active;
-  final int? count;
-  final VoidCallback onTap;
-  const _CatChip({required this.cat, required this.active, required this.count, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = T.ac(cat.id);
-    return HoverFx(
-      onTap: onTap,
-      builder: (h) => AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: active ? accent : (h ? accent.withValues(alpha: .08) : T.surf),
-          border: Border.all(color: active ? accent : (h ? accent.withValues(alpha: .4) : T.bdr)),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(cat.icon, style: const TextStyle(fontSize: 13)),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(cat.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: F.syne(
-                    size: 12,
-                    weight: FontWeight.w600,
-                    color: active ? T.onAccent(accent) : (h ? accent : T.text))),
-          ),
-          if (count != null) ...[
-            const SizedBox(width: 6),
-            Text('$count', style: F.mono(size: 10.5, color: active ? T.onAccent(accent) : T.dim)),
-          ],
-        ]),
-      ),
-    );
-  }
-}
-
 /// Sticky nav header.
 class _NavDelegate extends SliverPersistentHeaderDelegate {
   final AppState app;
@@ -1065,10 +358,13 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
 
   static const double height = 58;
 
+  /// Taller on a phone, where the location line sits under the logo.
+  static double heightFor(bool narrow) => narrow ? 64 : height;
+
   @override
-  double get minExtent => height;
+  double get minExtent => heightFor(width <= 768);
   @override
-  double get maxExtent => height;
+  double get maxExtent => heightFor(width <= 768);
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
@@ -1089,40 +385,86 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
               children: [
                 const MenuBtn(),
                 const SizedBox(width: 10),
-                Tooltip(
-                  message: 'AOneGo9 — back to browse',
-                  child: HoverFx(
-                    onTap: () => app.switchCat('modelF'),
-                    builder: (h) => AnimatedOpacity(
-                      duration: const Duration(milliseconds: 160),
-                      opacity: h ? .82 : 1,
-                      child: BrandLogo(size: narrow ? 17 : 20),
-                    ),
+                // Logo, with where you are and who you are under it on a
+                // phone — the sketch's "Location · Profile name" line.
+                Flexible(
+                  flex: showSearch ? 0 : 1,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Tooltip(
+                        message: 'AOneGo9 — back to browse',
+                        child: HoverFx(
+                          onTap: () => app.switchCat('modelF'),
+                          builder: (h) => AnimatedOpacity(
+                            duration: const Duration(milliseconds: 160),
+                            opacity: h ? .82 : 1,
+                            child: BrandLogo(size: narrow ? 17 : 20),
+                          ),
+                        ),
+                      ),
+                      if (narrow) ...[
+                        const SizedBox(height: 3),
+                        // An icon rather than a 📍 emoji: the emoji font
+                        // loads late on web and showed as an empty box first.
+                        Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.location_on_rounded, size: 12, color: T.gold),
+                          const SizedBox(width: 2),
+                          Flexible(
+                            child: Text(
+                              [
+                                app.location,
+                                if (app.isLoggedIn) app.currentUser?['name']?.toString().split(' ').first ?? '',
+                              ].where((x) => x.isNotEmpty).join(' · '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: F.syne(size: 10.5, weight: FontWeight.w600, color: T.mut, height: 1.2),
+                            ),
+                          ),
+                        ]),
+                      ],
+                    ],
                   ),
                 ),
                 SizedBox(width: narrow ? 8 : 14),
-                if (showSearch)
-                  Expanded(child: MarketSearch(accent: accent))
-                else
-                  const Spacer(),
-                const SizedBox(width: 12),
-                if (showVendorBtn) ...[
-                  GhostBtn(label: 'Vendor Portal', onTap: () => app.setView('vendor-auth')),
-                  const SizedBox(width: 8),
-                ],
-                // Capped so a long first name shortens instead of pushing the
-                // bar past the edge of a 320px phone. (Flexible would split the
-                // free space with the Spacer and float the button inward.)
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: narrow ? 120 : 170),
-                  child: GhostBtn(
-                    label: app.isLoggedIn
-                        ? (app.currentUser?['name']?.toString().split(' ').first ?? 'Account')
-                        : 'Sign In',
-                    onTap: () => app.setView('account'),
-                    compact: narrow,
-                  ),
+                if (showSearch) Expanded(child: MarketSearch(accent: accent)),
+                const SizedBox(width: 10),
+                _BarIcon(
+                  icon: Icons.notifications_none_rounded,
+                  tooltip: 'Notifications · industry & news',
+                  badge: app.updateFeed.length,
+                  onTap: () => showNotifications(context, app),
                 ),
+                // A small phone signed out has room for one account control;
+                // "Sign In" says more than the bare icon there.
+                if (app.isLoggedIn || screenW(context) >= 400) ...[
+                  const SizedBox(width: 6),
+                  _BarIcon(
+                    icon: app.isLoggedIn ? Icons.person_rounded : Icons.person_outline_rounded,
+                    tooltip: app.isLoggedIn ? 'Your profile' : 'Profile',
+                    onTap: () => app.setView('account'),
+                  ),
+                ],
+                if (showVendorBtn) ...[
+                  const SizedBox(width: 8),
+                  GhostBtn(label: 'Vendor Portal', onTap: () => app.setView('vendor-auth')),
+                ],
+                if (!app.isLoggedIn || !narrow) ...[
+                  const SizedBox(width: 6),
+                  // Capped so a long first name shortens instead of pushing
+                  // the bar past the edge of a 320px phone.
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: narrow ? 90 : 170),
+                    child: GhostBtn(
+                      label: app.isLoggedIn
+                          ? (app.currentUser?['name']?.toString().split(' ').first ?? 'Account')
+                          : 'Sign In',
+                      onTap: () => app.setView('account'),
+                      compact: narrow,
+                    ),
+                  ),
+                ],
                 if (screenW(context) > 620) ...[
                   const SizedBox(width: 8),
                   GoldBtn(
@@ -1146,7 +488,56 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
       old.location != location ||
       old.width != width ||
       old.app.query != app.query ||
-      old.app.isLoggedIn != app.isLoggedIn;
+      old.app.isLoggedIn != app.isLoggedIn ||
+      old.app.updateFeed.length != app.updateFeed.length;
+}
+
+/// Square icon button for the nav, with an optional count badge.
+class _BarIcon extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final int badge;
+  final VoidCallback onTap;
+  const _BarIcon({required this.icon, required this.tooltip, required this.onTap, this.badge = 0});
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: tooltip,
+        child: HoverFx(
+          onTap: onTap,
+          builder: (h) => SizedBox(
+            width: 36,
+            height: 36,
+            child: Stack(clipBehavior: Clip.none, children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: h ? T.gold.withValues(alpha: .10) : Colors.transparent,
+                  border: Border.all(color: h ? T.gold.withValues(alpha: .45) : T.bdr),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 19, color: h ? T.gold : T.text),
+              ),
+              if (badge > 0)
+                Positioned(
+                  top: -5,
+                  right: -5,
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 17),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(color: T.red, borderRadius: BorderRadius.circular(9)),
+                    child: Text(badge > 9 ? '9+' : '$badge',
+                        textAlign: TextAlign.center,
+                        style: F.syne(size: 9.5, weight: FontWeight.w800, color: T.onAccent(T.red))),
+                  ),
+                ),
+            ]),
+          ),
+        ),
+      );
 }
 
 /// Phone-only pinned search row.
@@ -1289,10 +680,7 @@ class _DivTab extends StatelessWidget {
             Text(division.icon, style: const TextStyle(fontSize: 12)),
             const SizedBox(width: 7),
             Text(division.name,
-                style: F.syne(
-                    size: 12.5,
-                    weight: FontWeight.w700,
-                    color: active ? accent : (h ? T.cream : T.mut))),
+                style: F.syne(size: 12.5, weight: FontWeight.w700, color: active ? accent : (h ? T.cream : T.mut))),
             const SizedBox(width: 6),
             Text('$count', style: F.mono(size: 9.5, color: active ? accent : T.faint)),
           ]),
@@ -1325,8 +713,7 @@ class _DivisionPill extends StatelessWidget {
         PopupMenuItem(
           enabled: false,
           height: 30,
-          child: Text('DIVISIONS',
-              style: F.syne(size: 10, weight: FontWeight.w700, color: T.dim, letterSpacing: 1.5)),
+          child: Text('DIVISIONS', style: F.syne(size: 10, weight: FontWeight.w700, color: T.dim, letterSpacing: 1.5)),
         ),
         for (final x in divisions)
           PopupMenuItem(
@@ -1338,9 +725,7 @@ class _DivisionPill extends StatelessWidget {
               Expanded(
                 child: Text(x.name,
                     style: F.syne(
-                        size: 13,
-                        weight: FontWeight.w700,
-                        color: x.id == app.activeDivision ? T.dac(x.id) : T.text)),
+                        size: 13, weight: FontWeight.w700, color: x.id == app.activeDivision ? T.dac(x.id) : T.text)),
               ),
               Text('${catsByDivision[x.id]?.length ?? 0}', style: F.mono(size: 10, color: T.faint)),
             ]),
@@ -1619,9 +1004,7 @@ class _CTab extends StatelessWidget {
         curve: Curves.easeOut,
         padding: EdgeInsets.symmetric(horizontal: narrow ? 12 : 16, vertical: narrow ? 8 : 11),
         decoration: BoxDecoration(
-          color: active
-              ? accent.withValues(alpha: .16)
-              : (h ? accent.withValues(alpha: .10) : T.card),
+          color: active ? accent.withValues(alpha: .16) : (h ? accent.withValues(alpha: .10) : T.card),
           border: Border.all(
             color: active ? accent : accent.withValues(alpha: h ? .65 : .34),
             width: active ? 1.6 : 1.2,
@@ -1693,10 +1076,7 @@ class _FilterChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(label,
-              style: F.syne(
-                  size: 12.5,
-                  weight: FontWeight.w600,
-                  color: active ? T.onAccent(T.cream) : T.text)),
+              style: F.syne(size: 12.5, weight: FontWeight.w600, color: active ? T.onAccent(T.cream) : T.text)),
         ),
       );
 }

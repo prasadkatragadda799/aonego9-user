@@ -463,8 +463,8 @@ class _SlideView extends StatelessWidget {
               Positioned.fill(
                 child: DivisionFx(
                   divisionId: s.motif,
-                  // Brand gold on the dark poster ground, whatever the theme.
-                  accent: T.brandGold,
+                  // Marigold on the dark poster ground, whatever the theme.
+                  accent: T.marigold,
                   intensity: h ? 2.6 : 2.0,
                   fadeToward: Alignment.bottomLeft,
                 ),
@@ -535,7 +535,7 @@ class _SlideView extends StatelessWidget {
                       duration: const Duration(milliseconds: 160),
                       padding: EdgeInsets.symmetric(horizontal: narrow ? 14 : 18, vertical: narrow ? 9 : 11),
                       decoration: BoxDecoration(
-                        color: h ? T.logoAmber : T.brandGold,
+                        color: h ? T.logoAmber : T.marigold,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [

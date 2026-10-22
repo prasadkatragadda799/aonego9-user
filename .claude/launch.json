@@ -4,8 +4,30 @@
     {
       "name": "aonego9-user-web",
       "runtimeExecutable": "flutter",
-      "runtimeArgs": ["run", "-d", "web-server", "--web-port", "8731", "--web-hostname", "127.0.0.1"],
+      "runtimeArgs": [
+        "run",
+        "-d",
+        "web-server",
+        "--web-port",
+        "8731",
+        "--web-hostname",
+        "127.0.0.1"
+      ],
       "port": 8731
+    },
+    {
+      "name": "aonego9-user-release",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8732",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "build/web"
+      ],
+      "port": 8732
     }
   ]
 }

@@ -201,22 +201,18 @@ class AppTopBar extends StatelessWidget {
   }
 }
 
-/// Phone-only bottom dock — the same five destinations on every page, so a
-/// thumb always knows where Home, the floor, the digest, the account and the
-/// menu are. Browse passes [onHome]/[onFloor] to scroll in place; everywhere
-/// else they navigate back to browse.
+/// Phone-only bottom dock — the same six destinations on every page, as the
+/// client's sketch numbers them: Home, News & Media, Artists (talent
+/// profiles), Vendors (service providers), Menu and Profile. Browse passes
+/// [onHome] to scroll in place; everywhere else it navigates back to browse.
 class AppDock extends StatelessWidget {
   final VoidCallback? onHome;
-  final VoidCallback? onFloor;
-  const AppDock({super.key, this.onHome, this.onFloor});
+  const AppDock({super.key, this.onHome});
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final bottom = MediaQuery.of(context).padding.bottom;
-    final account = app.isLoggedIn
-        ? (app.currentUser?['name']?.toString().split(' ').first ?? 'Account')
-        : 'Sign in';
     final v = app.view;
     final onAccount = const {'account', 'login', 'subscription'}.contains(v);
     return Container(
@@ -230,15 +226,25 @@ class AppDock extends StatelessWidget {
         height: 60,
         child: Row(children: [
           _DockItem(icon: Icons.home_outlined, label: 'Home', active: v == 'browse', onTap: onHome ?? app.backToBrowse),
-          _DockItem(icon: Icons.grid_view_rounded, label: 'Floor', onTap: onFloor ?? app.backToBrowse),
           _DockItem(
-              icon: Icons.auto_stories_outlined,
-              label: 'Digest',
+              icon: Icons.newspaper_rounded,
+              label: 'News & Media',
               active: v == 'newsletter',
               onTap: () => app.setView('newsletter')),
           _DockItem(
-              icon: Icons.person_outline_rounded, label: account, active: onAccount, onTap: () => app.setView('account')),
+              icon: Icons.star_outline_rounded,
+              label: 'Artists',
+              onTap: () => app.openResults(division: 'talent')),
+          _DockItem(
+              icon: Icons.storefront_outlined,
+              label: 'Vendors',
+              onTap: () => app.openResults(division: 'crew')),
           _DockItem(icon: Icons.menu_rounded, label: 'Menu', onTap: () => openAppDrawer(context)),
+          _DockItem(
+              icon: app.isLoggedIn ? Icons.person_rounded : Icons.person_outline_rounded,
+              label: 'Profile',
+              active: onAccount,
+              onTap: () => app.setView('account')),
         ]),
       ),
     );
@@ -268,7 +274,7 @@ class _DockItem extends StatelessWidget {
               children: [
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
                   decoration: BoxDecoration(
                     color: active ? T.gold.withValues(alpha: .12) : Colors.transparent,
                     borderRadius: BorderRadius.circular(20),
@@ -276,11 +282,20 @@ class _DockItem extends StatelessWidget {
                   child: Icon(icon, size: 21, color: active ? T.gold : T.mut),
                 ),
                 const SizedBox(height: 3),
-                Text(label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: F.syne(
-                        size: 10.5, weight: active ? FontWeight.w700 : FontWeight.w600, color: active ? T.gold : T.mut)),
+                // Six tabs on a 320px phone leave ~53px each; scale a long
+                // label down rather than cutting it off.
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(label,
+                        maxLines: 1,
+                        style: F.syne(
+                            size: 10.5,
+                            weight: active ? FontWeight.w700 : FontWeight.w600,
+                            color: active ? T.gold : T.mut)),
+                  ),
+                ),
               ],
             ),
           ),

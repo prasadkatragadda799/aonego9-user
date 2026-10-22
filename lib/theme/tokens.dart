@@ -40,45 +40,53 @@ class T {
   static Color _p(Color dark, Color light) => _light ? light : dark;
 
   // ── Surfaces ───────────────────────────────────────────────────
-  // Light is warm paper, not clinical white: the display serif and the gold
-  // both sit badly on pure #FFF, and the ground carries a slight cream bias
-  // toward the brand hue so the palette reads as chosen rather than default.
-  static Color get bg => _p(const Color(0xFF09090B), const Color(0xFFF7F7F4));
-  static Color get surf => _p(const Color(0xFF101013), const Color(0xFFEFEEEA));
-  static Color get card => _p(const Color(0xFF17171B), const Color(0xFFFFFFFF));
-  static Color get bdr => _p(const Color(0xFF272730), const Color(0xFFDAD8D0));
-  static Color get bdhi => _p(const Color(0xFF3E3E46), const Color(0xFFBDB9AD));
+  // The traditional palette: saffron, maroon and marigold. Light is warm
+  // ivory rather than clinical white; dark is a deep maroon-black rather than
+  // a neutral grey-black, so both grounds carry the festive warmth.
+  static Color get bg => _p(const Color(0xFF140A0B), const Color(0xFFFBF6EC));
+  static Color get surf => _p(const Color(0xFF1C0F11), const Color(0xFFF3E8D6));
+  static Color get card => _p(const Color(0xFF261518), const Color(0xFFFFFFFF));
+  static Color get bdr => _p(const Color(0xFF3D2428), const Color(0xFFE3D2B6));
+  static Color get bdhi => _p(const Color(0xFF59363B), const Color(0xFFC9AD86));
 
   // ── Brand ──────────────────────────────────────────────────────
   /// The immutable brand anchor. Never theme-swapped — this is the colour the
-  /// logo and the other two apps are matched to. Use [gold] for UI.
+  /// current logo and the other two apps are matched to. Use [gold] for UI.
   static const brandGold = Color(0xFFC9A86C);
 
-  /// Gold as a UI colour. #C9A86C is only ~2.0:1 on a light page, so the
-  /// light theme uses a deepened gold of the same hue that clears AA as body
-  /// text and still reads unmistakably as the AOneGo9 brand. Gold — not a
-  /// generic marketplace blue — is the one action colour, so the light build
-  /// stays recognisably ours.
-  static Color get gold => _p(brandGold, const Color(0xFF7C5E21));
-  static Color get goldLight => _p(const Color(0xFFE3CFA3), const Color(0xFF6B501B));
-  static Color get goldDark => _p(const Color(0xFFA8884A), const Color(0xFF5E4718));
+  /// Marigold for accents on poster (always-dark) surfaces — tags and motion
+  /// over ads, reels and update cards. Identical in both themes.
+  static const marigold = Color(0xFFF5A623);
+
+  /// Deep maroon — the traditional counterpart to saffron, for festive
+  /// grounds and banners. Identical in both themes.
+  static const maroon = Color(0xFF8C1D2E);
+
+  /// The one action colour — named "gold" so no call site changes, but now
+  /// saffron: bright marigold on the dark ground, and a deep saffron on the
+  /// light one (marigold itself is ~2:1 on ivory, too faint for text).
+  static Color get gold => _p(marigold, const Color(0xFF9E4500));
+
+  /// Light: maroon, for emphasis beside saffron. Dark: a paler marigold.
+  static Color get goldLight => _p(const Color(0xFFFFC766), maroon);
+  static Color get goldDark => _p(const Color(0xFFD9821A), const Color(0xFF7A3300));
 
   // ── Text ramp ──────────────────────────────────────────────────
-  static Color get cream => _p(const Color(0xFFF0EBE0), const Color(0xFF15161A));
-  static Color get text => _p(const Color(0xFFE4DFD5), const Color(0xFF25272C));
-  static Color get mut => _p(const Color(0xFFA8A6B0), const Color(0xFF4D5058));
-  static Color get dim => _p(const Color(0xFF8A8894), const Color(0xFF5E6168));
+  static Color get cream => _p(const Color(0xFFFBF0E4), const Color(0xFF1F1513));
+  static Color get text => _p(const Color(0xFFEEDFD2), const Color(0xFF2F2321));
+  static Color get mut => _p(const Color(0xFFBCA79D), const Color(0xFF5B4743));
+  static Color get dim => _p(const Color(0xFFA48F85), const Color(0xFF6A5652));
 
   /// Decorative rules and disabled glyphs only — fails AA by design, in both
   /// themes. Anything a user must read uses text/mut/dim.
-  static Color get faint => _p(const Color(0xFF5C5A66), const Color(0xFFADAAA0));
+  static Color get faint => _p(const Color(0xFF6A4E50), const Color(0xFFB8A58C));
 
   // ── Status ─────────────────────────────────────────────────────
   // Danger comes in two weights because one colour cannot serve both jobs:
   // `red` is for FILLS and tints, `redText` for danger text on bg/surf/card.
   static Color get red => _p(const Color(0xFFBE3B3B), const Color(0xFFB33224));
-  static Color get redText => _p(const Color(0xFFE88A8A), const Color(0xFF9E2A1E));
-  static Color get grn => _p(const Color(0xFF6AAB88), const Color(0xFF1B7A35));
+  static Color get redText => _p(const Color(0xFFF08C8C), const Color(0xFF9E2A1E));
+  static Color get grn => _p(const Color(0xFF6AAB88), const Color(0xFF17702F));
 
   /// ── Literal logo colours ──────────────────────────────────────
   /// Sampled from the AOneGo9 master logo. These exist ONLY to render the
@@ -192,14 +200,14 @@ class T {
   /// paper weight, so a card that was a moody wash stays a wash rather than
   /// becoming a flat grey box.
   static const List<Color> _grTintDark = [
-    Color(0xFF1A1208), Color(0xFF0F1520), Color(0xFF180A14),
-    Color(0xFF0A1218), Color(0xFF121408), Color(0xFF160A0E),
-    Color(0xFF0F0818), Color(0xFF0A1808), Color(0xFF100F18),
+    Color(0xFF3A1A06), Color(0xFF3A0E16), Color(0xFF2E1A08),
+    Color(0xFF34101C), Color(0xFF3A2208), Color(0xFF2A0C12),
+    Color(0xFF301406), Color(0xFF3A1410), Color(0xFF2A1208),
   ];
   static const List<Color> _grTintLight = [
-    Color(0xFFF6EEDF), Color(0xFFE9EEF6), Color(0xFFF6E9F0),
-    Color(0xFFE6F0F4), Color(0xFFF1F3E2), Color(0xFFF7E9E9),
-    Color(0xFFEFE9F6), Color(0xFFE9F3E6), Color(0xFFECEBF5),
+    Color(0xFFFBEBD3), Color(0xFFF8E3E6), Color(0xFFFCEFD0),
+    Color(0xFFF6E2E8), Color(0xFFFBE9CC), Color(0xFFF5DEDF),
+    Color(0xFFFBE6D6), Color(0xFFF7E4DA), Color(0xFFF9ECD9),
   ];
 
   /// gr(i) — linear-gradient(145deg, …) at index i, wrapping.
@@ -223,7 +231,7 @@ class T {
   static LinearGradient grPoster(int i) => LinearGradient(
         begin: const Alignment(-0.5, -1),
         end: const Alignment(0.5, 1),
-        colors: [_grTintDark[i % 9], const Color(0xFF09090B)],
+        colors: [_grTintDark[i % 9], const Color(0xFF140A0B)],
       );
 
   /// Ink for copy sitting on a poster surface — fixed, never theme-swapped.
@@ -231,10 +239,10 @@ class T {
   static const posterInkMuted = Color(0xFFB8B4AC);
 
   /// Scrim over imagery, so overlaid copy stays legible on either ground.
-  static Color get scrim => _p(const Color(0xF509090B), const Color(0x9915161A));
+  static Color get scrim => _p(const Color(0xF5140A0B), const Color(0x991F1513));
 
   /// Translucent chrome behind pinned headers.
-  static Color get chrome => _p(const Color(0xF709090B), const Color(0xFFFFFFFF));
+  static Color get chrome => _p(const Color(0xF7140A0B), const Color(0xFFFFFBF4));
 }
 
 /// ─────────────────────────────────────────────

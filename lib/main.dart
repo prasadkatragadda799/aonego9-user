@@ -16,6 +16,7 @@ import 'screens/partners_screen.dart';
 import 'screens/team_screen.dart';
 import 'screens/sessions_screen.dart';
 import 'screens/connect_screen.dart';
+import 'screens/wedding_screen.dart';
 import 'widgets/app_drawer.dart';
 import 'widgets/newsletter_popup.dart';
 import 'widgets/toast.dart';
@@ -193,6 +194,9 @@ class _Root extends StatelessWidget {
         break;
       case 'connect':
         body = const ConnectScreen();
+        break;
+      case 'wedding':
+        body = const WeddingScreen();
         break;
       default:
         body = const BrowseScreen();

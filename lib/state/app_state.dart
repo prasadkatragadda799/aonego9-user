@@ -41,7 +41,7 @@ class Inquiry {
 
 /// AppState — direct port of App()'s useState machine.
 class AppState extends ChangeNotifier {
-  String view = 'browse'; // browse | profile | vendor-auth | newsletter | events | about | partners | team | sessions | connect | login | account | subscription
+  String view = 'browse'; // browse | wedding | profile | vendor-auth | newsletter | events | about | partners | team | sessions | connect | login | account | subscription
   Map<String, dynamic>? selectedProfile;
   NewsletterIssue? selectedIssue;
 
@@ -959,6 +959,34 @@ class AppState extends ChangeNotifier {
     view = 'browse';
     selectedProfile = null;
     selectedIssue = null;
+    notifyListeners();
+  }
+
+  /// Set when something asks Browse to bring the results grid into view, and
+  /// cleared by Browse when it scrolls — so a tap on the Artists / Vendors
+  /// dock tabs scrolls even when it arrives from another page and Browse is
+  /// only being built for the first time.
+  bool _wantsResults = false;
+
+  /// True once per [openResults] call.
+  bool takeResultsRequest() {
+    final w = _wantsResults;
+    _wantsResults = false;
+    return w;
+  }
+
+  /// Browse, with [cat] (or the first category of [division]) selected and
+  /// the listings scrolled into view.
+  void openResults({String? cat, String? division}) {
+    view = 'browse';
+    selectedProfile = null;
+    selectedIssue = null;
+    if (cat != null) {
+      switchCat(cat);
+    } else if (division != null && activeDivision != division) {
+      switchDivision(division);
+    }
+    _wantsResults = true;
     notifyListeners();
   }
 }

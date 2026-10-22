@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/geo.dart';
+import '../data/taxonomy.dart';
 import '../services/voice_search.dart';
 import '../state/app_state.dart';
 import '../theme/tokens.dart';
@@ -29,9 +32,17 @@ class _MarketSearchState extends State<MarketSearch> {
   bool _listening = false;
   List<GeoSuggestion> _suggestions = const [];
 
+  // The hint cycles through real category names — 'Search "Photography"',
+  // 'Search "Event Venues"' — so an empty field still shows what can be found.
+  Timer? _hintTimer;
+  int _hint = 0;
+
   @override
   void initState() {
     super.initState();
+    _hintTimer = Timer.periodic(const Duration(milliseconds: 2600), (_) {
+      if (mounted && !_focus.hasFocus && _controller.text.isEmpty) setState(() => _hint++);
+    });
     _focus.addListener(() {
       if (_focus.hasFocus) {
         _refreshSuggestions(_controller.text);
@@ -46,6 +57,7 @@ class _MarketSearchState extends State<MarketSearch> {
 
   @override
   void dispose() {
+    _hintTimer?.cancel();
     _hide();
     _controller.dispose();
     _focus.dispose();
@@ -149,14 +161,7 @@ class _MarketSearchState extends State<MarketSearch> {
                   isDense: true,
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 13),
-                  // Three tiers rather than two: at phone width the place
-                  // pill takes real estate the hint used to have, and a
-                  // half-truncated sentence reads worse than a short one.
-                  hintText: switch (screenW(context)) {
-                    < 420 => 'Search',
-                    < 900 => 'Search name, city or state',
-                    _ => 'Search talent, crews, studios — or a city, area or state',
-                  },
+                  hintText: 'Search "${catalogue[_hint % catalogue.length].name}"',
                   hintStyle: F.syne(size: 13, weight: FontWeight.w400, color: T.dim),
                 ),
               ),

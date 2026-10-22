@@ -19,6 +19,7 @@ import 'package:aonego9_user/screens/profile_screen.dart';
 import 'package:aonego9_user/screens/account_screen.dart';
 import 'package:aonego9_user/screens/subscription_screen.dart';
 import 'package:aonego9_user/screens/browse_screen.dart';
+import 'package:aonego9_user/screens/wedding_screen.dart';
 
 final sample = <String, dynamic>{
   'id': 'x1', 'cat': 'photo', 'name': 'Rhea Kapoor Photography & Films Studio', 'loc': 'Andheri West, Mumbai',
@@ -37,6 +38,7 @@ void main() {
 
   final pages = <String, Widget Function()>{
     'browse': () => const BrowseScreen(),
+    'wedding': () => const WeddingScreen(),
     'about': () => const AboutScreen(),
     'events': () => const EventsScreen(),
     'connect': () => const ConnectScreen(),
