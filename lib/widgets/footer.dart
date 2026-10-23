@@ -12,7 +12,10 @@ import 'common.dart';
 /// `setLocation`, `setView`), so this adds navigation surface without adding
 /// any new behaviour.
 class SiteFooter extends StatelessWidget {
-  const SiteFooter({super.key});
+  /// Extra room at the very bottom for anything floating over the page
+  /// (the Reels and Shortlist buttons on browse), so it never covers a link.
+  final double bottomInset;
+  const SiteFooter({super.key, this.bottomInset = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +33,7 @@ class SiteFooter extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1280),
           child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, 44, pad, 28),
+            padding: EdgeInsets.fromLTRB(pad, 44, pad, 28 + bottomInset),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -116,6 +119,7 @@ class SiteFooter extends StatelessWidget {
                     _Col(
                       title: 'Company',
                       children: [
+                        _Link(label: 'Advertise with us', accent: T.gold, onTap: () => app.setView('advertise')),
                         _Link(label: 'Contact us', accent: T.gold, onTap: () => app.openConnect('contact')),
                         _Link(label: 'Join us', accent: T.gold, onTap: () => app.openConnect('join')),
                         _Link(label: 'Apply as artist', accent: T.gold, onTap: () => app.openConnect('apply')),

@@ -234,11 +234,13 @@ class AppDock extends StatelessWidget {
           _DockItem(
               icon: Icons.star_outline_rounded,
               label: 'Artists',
-              onTap: () => app.openResults(division: 'talent')),
+              active: v == 'artists',
+              onTap: () => app.setView('artists')),
           _DockItem(
               icon: Icons.storefront_outlined,
               label: 'Vendors',
-              onTap: () => app.openResults(division: 'crew')),
+              active: v == 'vendors',
+              onTap: () => app.setView('vendors')),
           _DockItem(icon: Icons.menu_rounded, label: 'Menu', onTap: () => openAppDrawer(context)),
           _DockItem(
               icon: app.isLoggedIn ? Icons.person_rounded : Icons.person_outline_rounded,

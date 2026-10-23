@@ -15,6 +15,9 @@ import '../widgets/home_sections.dart';
 import '../widgets/market_search.dart';
 import '../widgets/updates_bar.dart';
 import '../widgets/listing_card.dart';
+import '../widgets/results_kit.dart';
+import '../widgets/home_showcase.dart';
+import '../widgets/reels_viewer.dart';
 import '../widgets/spotlight_reel.dart';
 import '../widgets/footer.dart';
 
@@ -41,6 +44,10 @@ class BrowseScreen extends StatefulWidget {
 class _BrowseScreenState extends State<BrowseScreen> {
   final _scroll = ScrollController();
   final _resultsKey = GlobalKey();
+
+  /// Grid or list for the results. Null follows the screen: list rows on a
+  /// phone, the portfolio grid on anything wider.
+  bool? _listView;
 
   @override
   void dispose() {
@@ -109,10 +116,17 @@ class _BrowseScreenState extends State<BrowseScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // The client's second sketch, top to bottom: advertise your
+                  // business, the photo/video ad reel, partner logos, event
+                  // posters, industry experts — then the earlier sections.
+                  AdvertiseBanner(app: app),
                   PromoStrip(app: app),
                   // The big advertisement: video / poster creatives, events
                   // and workshops, each tapping through to its page or site.
                   SpotlightReel(onOpenDivision: _openDivision),
+                  PartnerLogoStrip(app: app),
+                  EventPosterShow(app: app),
+                  IndustryExperts(app: app),
                   ListingProfiles(app: app),
                   QuickTiles(app: app),
                   UpdatesFolders(app: app),
@@ -145,16 +159,44 @@ class _BrowseScreenState extends State<BrowseScreen> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SiteFooter()),
+        const SliverToBoxAdapter(child: SiteFooter(bottomInset: 64)),
       ],
     );
+
+    // Floating over the page, just above the bottom bar: Reels always, and
+    // the shortlist once anything is hearted.
+    final shortlisted = app.shortlist.length;
+    final body = Stack(children: [
+      Positioned.fill(child: page),
+      Positioned(
+        left: 0,
+        right: 0,
+        bottom: narrow ? 14 : 24,
+        child: Center(
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            ReelsPill(onTap: () => showReelsViewer(context)),
+            // The shortlist slides in beside Reels once anything is hearted.
+            AnimatedSize(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              child: shortlisted == 0
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.only(left: 10),
+                      child: ShortlistPill(count: shortlisted, onTap: () => showShortlistSheet(context)),
+                    ),
+            ),
+          ]),
+        ),
+      ),
+    ]);
 
     return Container(
       color: T.bg,
       child: narrow
           ? Column(
               children: [
-                Expanded(child: page),
+                Expanded(child: body),
                 AppDock(
                   onHome: () {
                     if (_scroll.hasClients) {
@@ -164,98 +206,53 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 ),
               ],
             )
-          : page,
+          : body,
     );
   }
 
-  /// Results header — "Photographers in Mumbai", the count, the division,
-  /// any active search term, then the category's filter chips.
+  /// Results header — the category's stage, its looks, then the toolbar.
   Widget _listBar(BuildContext context, AppState app, Color accent, Cat cat, int count) {
-    final fs = app.filtersFor(app.activeCat);
     final narrow = isNarrow(context);
-    final division = divisionById[cat.division];
-    final place = app.location == 'All India' ? 'All India' : app.location;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(narrow ? 16 : 20, 20, narrow ? 16 : 20, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('${cat.icon}  ${cat.name} in $place',
-              style: F.fraunces(size: narrow ? 19 : 23, weight: FontWeight.w700, color: T.cream, height: 1.25)),
-          const SizedBox(height: 6),
-          Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              Text('$count ${count == 1 ? 'listing' : 'listings'}',
-                  style: F.syne(size: 13, weight: FontWeight.w700, color: T.text)),
-              if (division != null)
-                Text('·  ${division.name}', style: F.syne(size: 13, weight: FontWeight.w500, color: T.mut)),
-              if (app.query.isNotEmpty)
-                HoverFx(
-                  onTap: app.clearQuery,
-                  builder: (h) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: T.gold.withValues(alpha: .08),
-                      border: Border.all(color: T.gold.withValues(alpha: h ? .6 : .3)),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text('"${app.query}"', style: F.syne(size: 12, weight: FontWeight.w600, color: T.gold)),
-                      const SizedBox(width: 5),
-                      Icon(Icons.close_rounded, size: 13, color: T.gold),
-                    ]),
-                  ),
-                ),
-            ],
-          ),
-          if (cat.sub.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: Text(cat.sub, style: F.syne(size: 13, weight: FontWeight.w400, color: T.dim, height: 1.5)),
-            ),
-          ],
-          if (fs.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            // One scrolling row on a phone (a wrapped block of chips pushes the
-            // results off the first screen); wrapped on wider screens.
-            narrow
-                ? SizedBox(
-                    height: 34,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: fs.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 6),
-                      itemBuilder: (_, i) => _FilterChip(
-                          label: fs[i], active: app.filter == fs[i], accent: accent, onTap: () => app.setFilter(fs[i])),
-                    ),
-                  )
-                : Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final f in fs)
-                        _FilterChip(label: f, active: app.filter == f, accent: accent, onTap: () => app.setFilter(f)),
-                    ],
-                  ),
-          ],
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CategoryStage(
+          app: app,
+          cat: cat,
+          onDesk: () => showDeskBrief(context, cat: cat),
+        ),
+        const SizedBox(height: 18),
+        LookTiles(app: app, accent: accent),
+        ResultsToolbar(
+          app: app,
+          accent: accent,
+          count: count,
+          listView: _listView ?? narrow,
+          onListView: (v) => setState(() => _listView = v),
+        ),
+      ],
     );
   }
 
   Widget _grid(BuildContext context, AppState app, Color accent, List<Map<String, dynamic>> items, double w) {
-    final pad = isNarrow(context) ? 16.0 : 20.0;
+    final narrow = isNarrow(context);
+    final pad = narrow ? 16.0 : 20.0;
+    final cat = catOf(app.activeCat) ?? catalogue.first;
+    final asList = _listView ?? narrow;
+    // Portfolio cards: repeat(auto-fill, minmax(260px, 1fr)) — one on a
+    // small phone, two on a large phone, three on a tablet, four on desktop.
+    // List rows want more room each: one column up to a tablet, then two.
+    final avail = (w.clamp(0, 1280)) - pad * 2;
+    final cols = asList ? (avail / 460).floor().clamp(1, 2) : (avail / 260).floor().clamp(1, 4);
+    final gap = cols == 1 ? 14.0 : 18.0;
+
     if (items.isEmpty && app.listingsLoading) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 80),
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: T.gold)),
+        padding: EdgeInsets.symmetric(horizontal: pad),
+        child: _ListingsLoading(cols: cols, row: asList, gap: gap),
       );
     }
-    if (items.isEmpty) {
+    if (items.isEmpty && app.listingsFailed) {
       return Padding(
         padding: EdgeInsets.symmetric(vertical: 20, horizontal: pad),
         child: Container(
@@ -269,54 +266,110 @@ class _BrowseScreenState extends State<BrowseScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('📍', style: TextStyle(fontSize: 30)),
+              const Text('📡', style: TextStyle(fontSize: 30)),
               const SizedBox(height: 10),
-              Text(
-                app.filteredToNothing ? 'Nothing matches that here' : 'Nothing in this category in ${app.location} yet',
-                textAlign: TextAlign.center,
-                style: F.syne(size: 15, weight: FontWeight.w600, color: T.text),
-              ),
+              Text('Couldn\'t reach AOneGo9 right now',
+                  textAlign: TextAlign.center, style: F.syne(size: 15, weight: FontWeight.w600, color: T.text)),
+              const SizedBox(height: 6),
+              Text('Check your connection and try again.',
+                  textAlign: TextAlign.center, style: F.syne(size: 13, weight: FontWeight.w400, color: T.mut)),
               const SizedBox(height: 14),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  // Offer to undo the filter that actually caused the blank —
-                  // telling someone to "see all India" when their search term
-                  // is what emptied the grid sends them the wrong way.
-                  if (app.query.isNotEmpty) _EmptyAction(label: 'Clear search', onTap: app.clearQuery),
-                  _EmptyAction(label: 'See all India', onTap: () => app.setLocation('All India')),
-                  _EmptyAction(label: 'Add yours →', onTap: () => app.openConnect('apply')),
-                ],
-              ),
+              _EmptyAction(label: 'Try again', onTap: app.fetchListings),
             ],
           ),
         ),
       );
     }
-    // Portfolio cards: repeat(auto-fill, minmax(260px, 1fr)) — one on a
-    // small phone, two on a large phone, three on a tablet, four on desktop.
-    final avail = (w.clamp(0, 1280)) - pad * 2;
-    final cols = (avail / 260).floor().clamp(1, 4);
+    if (items.isEmpty) {
+      final filtered = app.filteredToNothing;
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: 8, horizontal: pad),
+        child: Flex(
+          direction: narrow ? Axis.vertical : Axis.horizontal,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Flexible(
+              flex: narrow ? 0 : 1,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: T.card,
+                  border: Border.all(color: T.bdr),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('📍', style: TextStyle(fontSize: 30)),
+                    const SizedBox(height: 10),
+                    Text(
+                      filtered ? 'Nothing matches that here' : 'Nothing in this category in ${app.location} yet',
+                      textAlign: TextAlign.center,
+                      style: F.syne(size: 15, weight: FontWeight.w600, color: T.text),
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        // Offer to undo the filter that actually caused the blank —
+                        // telling someone to "see all India" when their search term
+                        // is what emptied the grid sends them the wrong way.
+                        if (app.query.isNotEmpty) _EmptyAction(label: 'Clear search', onTap: app.clearQuery),
+                        if (app.verifiedOnly) _EmptyAction(label: 'Include unverified', onTap: app.toggleVerifiedOnly),
+                        if (app.filter != 'All') _EmptyAction(label: 'All looks', onTap: () => app.setFilter('All')),
+                        if (app.location != 'All India')
+                          _EmptyAction(label: 'See all India', onTap: () => app.setLocation('All India')),
+                        _EmptyAction(label: 'Add yours →', onTap: () => app.openConnect('apply')),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(width: narrow ? 0 : 18, height: narrow ? 14 : 0),
+            // An empty category is still a job someone wants done — hand it
+            // to the desk instead of ending the visit here.
+            Flexible(
+              flex: narrow ? 0 : 1,
+              child: DeskCard(cat: cat, place: app.location, empty: true, onTap: () => showDeskBrief(context, cat: cat)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final availIn = app.location == 'All India' ? null : app.location;
+    Widget card(Map<String, dynamic> item) => ListingCard(
+          item: item,
+          row: asList,
+          onView: () => app.openProfile(item),
+          onEnquire: () => showQuickEnquiry(context, item),
+          onShare: () => shareProfileOnWhatsApp(context, item),
+          onShortlist: () => app.toggleShortlist(item),
+          shortlisted: app.isShortlisted(item['id'] as String?),
+          availIn: availIn,
+        );
+    // The desk card sits after the first two rows, or at the end of a short
+    // list, so it is seen without interrupting the first look.
+    final deskAt = (cols * 2).clamp(1, items.length);
+    final desk = DeskCard(cat: cat, place: app.location, onTap: () => showDeskBrief(context, cat: cat));
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: pad),
       child: LayoutBuilder(builder: (context, bc) {
-        final gap = cols == 1 ? 14.0 : 18.0;
         final cardW = (bc.maxWidth - gap * (cols - 1)) / cols;
         return Wrap(
           spacing: gap,
           runSpacing: gap,
           children: [
-            for (final item in items)
-              SizedBox(
-                width: cardW,
-                child: ListingCard(
-                  item: item,
-                  onView: () => app.openProfile(item),
-                  availIn: app.location == 'All India' ? null : app.location,
-                ),
-              ),
+            for (var i = 0; i < items.length; i++) ...[
+              if (i == deskAt) SizedBox(width: cols > 2 ? cardW * 2 + gap : cardW, child: desk),
+              SizedBox(width: cardW, child: card(items[i])),
+            ],
+            if (deskAt == items.length) SizedBox(width: cols > 2 ? cardW * 2 + gap : cardW, child: desk),
           ],
         );
       }),
@@ -341,6 +394,45 @@ class _EmptyAction extends StatelessWidget {
           ),
           child: Text(label, style: F.syne(size: 13, weight: FontWeight.w700, color: T.gold)),
         ),
+      );
+}
+
+/// Placeholder grid for the listings. A cold backend can take most of a
+/// minute to answer, and a bare spinner for that long looks broken — after a
+/// few seconds it says so.
+class _ListingsLoading extends StatefulWidget {
+  final int cols;
+  final bool row;
+  final double gap;
+  const _ListingsLoading({required this.cols, required this.row, required this.gap});
+  @override
+  State<_ListingsLoading> createState() => _ListingsLoadingState();
+}
+
+class _ListingsLoadingState extends State<_ListingsLoading> {
+  bool _slow = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer(const Duration(seconds: 6), () {
+      if (mounted) setState(() => _slow = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ListingSkeletons(
+        cols: widget.cols,
+        row: widget.row,
+        gap: widget.gap,
+        note: _slow ? 'Still loading — this can take up to a minute' : null,
       );
 }
 
@@ -1056,27 +1148,4 @@ class _CTab extends StatelessWidget {
       ),
     );
   }
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool active;
-  final Color accent;
-  final VoidCallback onTap;
-  const _FilterChip({required this.label, required this.active, required this.accent, required this.onTap});
-  @override
-  Widget build(BuildContext context) => HoverFx(
-        onTap: onTap,
-        builder: (h) => AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(
-            color: active ? T.cream : (h ? T.surf : T.card),
-            border: Border.all(color: active ? T.cream : (h ? T.gold.withValues(alpha: .6) : T.bdhi)),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(label,
-              style: F.syne(size: 12.5, weight: FontWeight.w600, color: active ? T.onAccent(T.cream) : T.text)),
-        ),
-      );
 }

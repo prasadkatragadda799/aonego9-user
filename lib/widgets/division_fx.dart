@@ -45,6 +45,21 @@ class _DivisionFxState extends State<DivisionFx> with SingleTickerProviderStateM
     duration: Duration(milliseconds: _periodMs(widget.divisionId)),
   );
 
+  /// The home page stacks a dozen of these in one long column, and every
+  /// one kept repainting while scrolled out of sight. The clock still runs
+  /// (so a block scrolled back into view is mid-motion, not restarting),
+  /// but a frame is only painted while the block is on screen.
+  late final _OnScreenTick _tick = _OnScreenTick(_c, _onScreen);
+  Size _screen = Size.zero;
+
+  bool _onScreen() {
+    if (!mounted) return false;
+    final ro = context.findRenderObject();
+    if (ro is! RenderBox || !ro.attached || !ro.hasSize) return true;
+    final r = ro.localToGlobal(Offset.zero) & ro.size;
+    return r.bottom > 0 && r.right > 0 && r.top < _screen.height && r.left < _screen.width;
+  }
+
   static int _periodMs(String id) => switch (id) {
         'talent' => 5200,
         'crew' => 4000,
@@ -59,6 +74,7 @@ class _DivisionFxState extends State<DivisionFx> with SingleTickerProviderStateM
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _screen = MediaQuery.sizeOf(context);
     final still = MediaQuery.of(context).disableAnimations;
     if (still) {
       _c
@@ -71,6 +87,7 @@ class _DivisionFxState extends State<DivisionFx> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    _tick.dispose();
     _c.dispose();
     super.dispose();
   }
@@ -78,7 +95,7 @@ class _DivisionFxState extends State<DivisionFx> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     Widget paint = CustomPaint(
-      painter: _FxPainter(widget.divisionId, widget.accent, _c, widget.intensity,
+      painter: _FxPainter(widget.divisionId, widget.accent, _c, _tick, widget.intensity,
           // Copy at the top → motifs sit low; copy at the bottom → they sit high.
           low: (widget.fadeToward?.y ?? 1) <= 0),
       size: Size.infinite,
@@ -106,7 +123,7 @@ class _FxPainter extends CustomPainter {
   final Animation<double> t;
   final double k;
   final bool low;
-  _FxPainter(this.id, this.accent, this.t, this.k, {this.low = false}) : super(repaint: t);
+  _FxPainter(this.id, this.accent, this.t, Listenable repaint, this.k, {this.low = false}) : super(repaint: repaint);
 
   Color _a(double alpha) => accent.withValues(alpha: (alpha * k).clamp(0.0, 1.0));
 
@@ -335,4 +352,24 @@ class _FxPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _FxPainter old) => old.id != id || old.accent != accent || old.k != k || old.low != low;
+}
+
+/// Forwards the animation's ticks only while [visible] says the block is on
+/// screen — see [_DivisionFxState._tick].
+class _OnScreenTick extends ChangeNotifier {
+  final Animation<double> _source;
+  final bool Function() _visible;
+  _OnScreenTick(this._source, this._visible) {
+    _source.addListener(_onTick);
+  }
+
+  void _onTick() {
+    if (_visible()) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _source.removeListener(_onTick);
+    super.dispose();
+  }
 }

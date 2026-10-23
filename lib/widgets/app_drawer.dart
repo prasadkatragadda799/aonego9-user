@@ -154,6 +154,13 @@ class AppDrawer extends StatelessWidget {
                     const SizedBox(height: 18),
                     const _SectionLabel('Get in touch'),
                     _Item(
+                      icon: Icons.campaign_outlined,
+                      label: 'Advertise with us',
+                      hint: 'Ads, social media, shoots',
+                      active: app.view == 'advertise',
+                      onTap: () => _go(context, app, 'advertise'),
+                    ),
+                    _Item(
                       icon: Icons.mail_outline_rounded,
                       label: 'Contact us',
                       hint: 'Questions, press, support',

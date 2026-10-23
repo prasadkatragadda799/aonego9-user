@@ -11,6 +11,7 @@ import '../data/upload_service.dart';
 import '../widgets/chrome.dart';
 import '../widgets/common.dart';
 import '../widgets/form_fields.dart';
+import '../widgets/media_watch.dart';
 
 class NewsletterScreen extends StatelessWidget {
   const NewsletterScreen({super.key});
@@ -20,7 +21,7 @@ class NewsletterScreen extends StatelessWidget {
     final app = context.watch<AppState>();
     final pad = isNarrow(context) ? 16.0 : 24.0;
     return PageFrame(
-      title: 'Newsletter',
+      title: 'News & Media',
       body: Padding(
         padding: EdgeInsets.fromLTRB(pad, 0, pad, 48),
         child: Column(
@@ -36,20 +37,25 @@ class NewsletterScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _Tabs(active: app.newsletterTab, onChange: app.setNewsletterTab),
-            const SizedBox(height: 16),
-            // Industry verticals — fashion, film, music, agencies, modelling,
-            // production houses, events and industry bodies.
-            _VerticalFilter(
-              active: app.newsVertical,
-              populated: app.populatedVerticals,
-              onChange: app.setNewsVertical,
-            ),
-            const SizedBox(height: 22),
-            if (app.selectedIssue != null) ...[
-              _IssueDetail(issue: app.selectedIssue!),
-              const SizedBox(height: 28),
+            if (app.newsletterTab == 'watch') ...[
+              const SizedBox(height: 22),
+              const MediaWatch(),
+            ] else ...[
+              const SizedBox(height: 16),
+              // Industry verticals — fashion, film, music, agencies, modelling,
+              // production houses, events and industry bodies.
+              _VerticalFilter(
+                active: app.newsVertical,
+                populated: app.populatedVerticals,
+                onChange: app.setNewsVertical,
+              ),
+              const SizedBox(height: 22),
+              if (app.selectedIssue != null) ...[
+                _IssueDetail(issue: app.selectedIssue!),
+                const SizedBox(height: 28),
+              ],
+              _Grid(issues: app.newsletterTab == 'trend' ? app.trendIssues : app.happeningIssues),
             ],
-            _Grid(issues: app.newsletterTab == 'trend' ? app.trendIssues : app.happeningIssues),
             const SizedBox(height: 48),
             const _SubscribeBlock(),
             const SizedBox(height: 28),
@@ -139,6 +145,7 @@ class _Tabs extends StatelessWidget {
       children: [
         tab('happening', 'What\'s happening', 'Castings, weeks, new books'),
         tab('trend', 'Trends', 'How the floor is actually moving'),
+        tab('watch', 'Watch', 'Reels, brand films & event videos'),
       ],
     );
   }

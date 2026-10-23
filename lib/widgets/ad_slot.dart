@@ -308,7 +308,18 @@ class AdVideo extends StatefulWidget {
   final String posterUrl;
   final int bg;
   final String emoji;
-  const AdVideo({super.key, required this.url, required this.posterUrl, required this.bg, required this.emoji});
+
+  /// Autoplay has to start muted on the web; the reels player turns the
+  /// sound on once the viewer asks for it.
+  final bool muted;
+  const AdVideo({
+    super.key,
+    required this.url,
+    required this.posterUrl,
+    required this.bg,
+    required this.emoji,
+    this.muted = true,
+  });
 
   @override
   State<AdVideo> createState() => _AdVideoState();
@@ -337,7 +348,7 @@ class _AdVideoState extends State<AdVideo> {
         await c.dispose();
         return;
       }
-      await c.setVolume(0);
+      await c.setVolume(widget.muted ? 0 : 1);
       await c.setLooping(true);
       await c.play();
       setState(() => _controller = c);
@@ -345,6 +356,12 @@ class _AdVideoState extends State<AdVideo> {
       await c.dispose();
       if (mounted) setState(() => _failed = true);
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant AdVideo old) {
+    super.didUpdateWidget(old);
+    if (old.muted != widget.muted) _controller?.setVolume(widget.muted ? 0 : 1);
   }
 
   @override

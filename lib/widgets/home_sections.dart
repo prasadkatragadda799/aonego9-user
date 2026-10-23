@@ -10,6 +10,7 @@ import '../theme/tokens.dart';
 import 'ad_slot.dart' show AdStill, AdVideo, openAdCreative;
 import 'common.dart';
 import 'division_fx.dart';
+import 'reels_viewer.dart' show showReelsViewer;
 
 /// ─────────────────────────────────────────────────────────────────
 /// HOME SECTIONS — the blocks of the home page, in the order the client's
@@ -966,7 +967,7 @@ class _ReelsCarouselState extends State<ReelsCarousel> {
         children: [
           Padding(
             padding: EdgeInsets.symmetric(horizontal: pad),
-            child: HomeHeading('Reels', action: 'News & Media', onAction: () => app.setView('newsletter')),
+            child: HomeHeading('Reels', action: 'Watch all', onAction: () => showReelsViewer(context)),
           ),
           const SizedBox(height: 12),
           SizedBox(

@@ -17,6 +17,8 @@ import 'screens/team_screen.dart';
 import 'screens/sessions_screen.dart';
 import 'screens/connect_screen.dart';
 import 'screens/wedding_screen.dart';
+import 'screens/advertise_screen.dart';
+import 'screens/hub_screen.dart';
 import 'widgets/app_drawer.dart';
 import 'widgets/newsletter_popup.dart';
 import 'widgets/toast.dart';
@@ -197,6 +199,13 @@ class _Root extends StatelessWidget {
         break;
       case 'wedding':
         body = const WeddingScreen();
+        break;
+      case 'advertise':
+        body = const AdvertiseScreen();
+        break;
+      case 'artists':
+      case 'vendors':
+        body = HubScreen(key: ValueKey(app.view), kind: app.view);
         break;
       default:
         body = const BrowseScreen();

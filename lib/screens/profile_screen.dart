@@ -340,6 +340,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _PnavBtn(label: '🔗 Copy', onTap: () => _copyLink(app)),
             const SizedBox(width: 6),
           ],
+          // The same shortlist the results' hearts fill — a profile reached
+          // from search, a reel or a shared link can join it from here.
+          _PnavBtn(
+            label: app.isShortlisted('${p['id'] ?? ''}') ? '♥ Saved' : '♡ Save',
+            onTap: () => app.toggleShortlist(p),
+          ),
+          const SizedBox(width: 6),
           _PnavBtn(label: 'Share', onTap: () => _share(app, 'Profile')),
         ],
       ),

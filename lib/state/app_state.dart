@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/api_client.dart';
@@ -41,7 +43,7 @@ class Inquiry {
 
 /// AppState — direct port of App()'s useState machine.
 class AppState extends ChangeNotifier {
-  String view = 'browse'; // browse | wedding | profile | vendor-auth | newsletter | events | about | partners | team | sessions | connect | login | account | subscription
+  String view = 'browse'; // browse | wedding | artists | vendors | advertise | profile | vendor-auth | newsletter | events | about | partners | team | sessions | connect | login | account | subscription
   Map<String, dynamic>? selectedProfile;
   NewsletterIssue? selectedIssue;
 
@@ -116,6 +118,104 @@ class AppState extends ChangeNotifier {
 
   /// Free-text marketplace search — name, tagline, tags, city.
   String query = '';
+
+  /// ── Results controls ──────────────────────────────────────────
+  /// Order of the grid. 'recommended' keeps the backend's own ranking.
+  /// Kept across categories: someone who wants top-rated wants it everywhere.
+  String sortBy = 'recommended'; // recommended | rating | bookings | new
+  static const sortLabels = {
+    'recommended': 'Recommended',
+    'rating': 'Top rated',
+    'bookings': 'Most booked',
+    'new': 'New faces',
+  };
+  bool verifiedOnly = false;
+
+  void setSort(String s) {
+    if (sortBy == s || !sortLabels.containsKey(s)) return;
+    sortBy = s;
+    notifyListeners();
+  }
+
+  void toggleVerifiedOnly() {
+    verifiedOnly = !verifiedOnly;
+    notifyListeners();
+  }
+
+  /// ── Shortlist ─────────────────────────────────────────────────
+  /// Profiles the visitor has hearted while browsing — the casting
+  /// director's pile. Survives reloads, and can be briefed or shared as one.
+  final Map<String, Map<String, dynamic>> _shortlist = {};
+  static const _shortlistKey = 'shortlist_v1';
+
+  /// Only what a shortlist row and a share message need; the full profile is
+  /// re-fetched when one is opened.
+  static const _shortlistFields = [
+    'id', 'cat', 'name', 'loc', 'rating', 'reviewCount', 'verified',
+    'avatarUrl', 'emoji', 'tagline', 'isNew',
+  ];
+
+  List<Map<String, dynamic>> get shortlist => _shortlist.values.toList();
+  bool isShortlisted(String? id) => id != null && _shortlist.containsKey(id);
+
+  void toggleShortlist(Map<String, dynamic> item) {
+    final id = '${item['id'] ?? ''}';
+    if (id.isEmpty) return;
+    if (_shortlist.remove(id) == null) {
+      _shortlist[id] = {for (final k in _shortlistFields) if (item[k] != null) k: item[k]};
+      showToast('Added to shortlist', '${item['name'] ?? 'Profile'} · ${_shortlist.length} saved', '♥');
+    } else {
+      notifyListeners();
+    }
+    _saveShortlist();
+  }
+
+  void removeFromShortlist(String id) {
+    if (_shortlist.remove(id) == null) return;
+    notifyListeners();
+    _saveShortlist();
+  }
+
+  void clearShortlist() {
+    if (_shortlist.isEmpty) return;
+    _shortlist.clear();
+    notifyListeners();
+    _saveShortlist();
+  }
+
+  /// Opens a shortlisted profile — from the loaded grid when it is there,
+  /// otherwise fetched fresh, since the saved copy is deliberately thin.
+  void openShortlisted(Map<String, dynamic> item) {
+    final id = '${item['id'] ?? ''}';
+    final loaded = (_apiListings ?? const <Map<String, dynamic>>[]).where((v) => v['id'] == id);
+    if (loaded.isNotEmpty) {
+      openProfile(loaded.first);
+    } else {
+      _openSharedProfile(id, reportFailure: true);
+    }
+  }
+
+  Future<void> _saveShortlist() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_shortlistKey, jsonEncode(_shortlist.values.toList()));
+    } catch (_) {}
+  }
+
+  Future<void> _restoreShortlist() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_shortlistKey);
+      if (raw == null) return;
+      for (final m in (jsonDecode(raw) as List).whereType<Map>()) {
+        final id = '${m['id'] ?? ''}';
+        if (id.isNotEmpty) _shortlist[id] = m.cast<String, dynamic>();
+      }
+      notifyListeners();
+    } catch (_) {
+      // A corrupt entry is not worth a crash; start the pile again.
+    }
+  }
   ToastMsg? toast;
   String vendorName = 'Vendor';
 
@@ -210,6 +310,10 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> _platformEvents = [];
   final Map<String, List<String>> _apiFilters = {};
   bool listingsLoading = false;
+  /// True when the last listings fetch failed (timeout, server down) rather
+  /// than returning nothing — the grid must not pass an outage off as an
+  /// empty category.
+  bool listingsFailed = false;
   bool eventsLoading = false;
 
   List<AdCreative> _ads = [];
@@ -338,10 +442,21 @@ class AppState extends ChangeNotifier {
   /// already left cannot overwrite the grid they are looking at now.
   int _listingsToken = 0;
 
+  /// Lets tests put listings on the floor without a backend.
+  @visibleForTesting
+  void debugSetListings(List<Map<String, dynamic>> items) {
+    _listingsToken++; // any fetch still in flight must not overwrite these
+    _apiListings = items;
+    listingsLoading = false;
+    listingsFailed = false;
+    notifyListeners();
+  }
+
   Future<void> fetchListings() async {
     final token = ++_listingsToken;
     final forCat = activeCat;
     listingsLoading = true;
+    listingsFailed = false;
     notifyListeners();
     try {
       // A state cannot be sent as `city` — the backend would match nothing.
@@ -362,6 +477,7 @@ class AppState extends ChangeNotifier {
     } catch (_) {
       if (token != _listingsToken) return;
       _apiListings = [];
+      listingsFailed = true;
     } finally {
       if (token == _listingsToken) {
         listingsLoading = false;
@@ -512,6 +628,86 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// ── Featured talent ───────────────────────────────────────────
+  /// The home page's "Industry experts" row and the artists' reels draw on
+  /// real talent profiles, best-rated first. Fetched once per location.
+  List<Map<String, dynamic>> featuredTalent = const [];
+  String _featuredFor = '';
+
+  Future<void> fetchFeaturedTalent() async {
+    final forLoc = location;
+    if (_featuredFor == forLoc && featuredTalent.isNotEmpty) return;
+    try {
+      final rows = await _repo.listings(
+        category: _searchTermFor('modelF'),
+        city: GeoIndex.cityParamFor(forLoc),
+        pageSize: 24,
+      );
+      if (forLoc != location) return;
+      featuredTalent = _stableSort(
+        _scopedToLocation(rows.map(_normaliseVendor).toList()),
+        (a, b) => ((b['rating'] as num?) ?? 0).compareTo((a['rating'] as num?) ?? 0),
+      );
+      _featuredFor = forLoc;
+      notifyListeners();
+    } catch (_) {
+      // The row falls back to its own "promote your profile" cards.
+    }
+  }
+
+  /// ── Profile search ────────────────────────────────────────────
+  /// Find a profile by name across a whole hub (all artist categories, or
+  /// all vendor categories). The backend has no name search, so each
+  /// category's listing for this location is fetched once and searched here.
+  final Map<String, List<Map<String, dynamic>>> _hubCache = {};
+
+  /// Lets tests answer [searchProfiles] for one category without a backend.
+  @visibleForTesting
+  void debugSeedSearch(String catId, List<Map<String, dynamic>> items) =>
+      _hubCache['${_searchTermFor(catId)}|$location'] = items;
+
+  /// Null when nothing could be loaded at all (backend unreachable), so the
+  /// UI can say so instead of claiming there is no such profile.
+  Future<List<Map<String, dynamic>>?> searchProfiles(String q, List<String> catIds) async {
+    final term = q.trim().toLowerCase();
+    if (term.length < 2) return const [];
+    // Several categories share one backend term (both model categories ask
+    // for "talent"), so fetch per term, not per category.
+    final terms = {for (final c in catIds) _searchTermFor(c)}.toList();
+    final loc = location;
+    var failures = 0;
+    final lists = await Future.wait(terms.map((t) async {
+      final key = '$t|$loc';
+      final hit = _hubCache[key];
+      if (hit != null) return hit;
+      try {
+        final rows = await _repo.listings(category: t, city: GeoIndex.cityParamFor(loc), pageSize: 60);
+        return _hubCache[key] = _scopedToLocation(rows.map(_normaliseVendor).toList());
+      } catch (_) {
+        failures++;
+        return const <Map<String, dynamic>>[];
+      }
+    }));
+    if (failures == terms.length) return null;
+
+    final wanted = catIds.toSet();
+    final seen = <String>{};
+    final out = <Map<String, dynamic>>[];
+    for (final list in lists) {
+      for (final v in list) {
+        if (!wanted.contains(v['cat'])) continue;
+        final hay = [v['name'], v['tagline'], v['loc'], ...((v['tags'] as List?) ?? const [])]
+            .map((e) => '${e ?? ''}')
+            .join(' ')
+            .toLowerCase();
+        if (hay.contains(term) && seen.add('${v['id']}')) out.add(v);
+      }
+    }
+    // Names that start with the term first — the profile they already know.
+    int rank(Map<String, dynamic> v) => '${v['name'] ?? ''}'.toLowerCase().startsWith(term) ? 0 : 1;
+    return _stableSort(out, (a, b) => rank(a).compareTo(rank(b))).take(20).toList();
+  }
+
   /// Load filter chips for each browse category from the backend.
   Future<void> fetchCategories() async {
     try {
@@ -581,6 +777,10 @@ class AppState extends ChangeNotifier {
       ],
       'revList': <dynamic>[],
       'isNew': bookings == 0,
+      // Starting price, when the backend sends one — the card shows "From ₹…"
+      // and simply leaves it out otherwise.
+      'fromPrice': [v['starting_price'], v['min_price'], v['price_from']]
+          .firstWhere((e) => e is num && e > 0, orElse: () => null),
       '_raw': v,
     };
     profile['stats'] = VendorProfileUtils.buildDefaultStats(profile);
@@ -645,12 +845,14 @@ class AppState extends ChangeNotifier {
   AppState() {
     _initFromUrl();
     fetchListings();
+    fetchFeaturedTalent();
     fetchTickerEvents();
     fetchCategories();
     fetchPlatformEvents();
     fetchNewsletters();
     fetchDirectory();
     _restoreThemeMode();
+    _restoreShortlist();
     restoreSession();
     _maybeShowNewsletterPopup();
   }
@@ -704,6 +906,12 @@ class AppState extends ChangeNotifier {
       case 'partners':
       case 'team':
       case 'sessions':
+      // ?go=advertise is the link the desk sends to businesses; the hubs
+      // and the wedding page are worth sharing on their own too.
+      case 'advertise':
+      case 'artists':
+      case 'vendors':
+      case 'wedding':
         view = parts[0];
         break;
       case 'vendor-auth':
@@ -717,7 +925,9 @@ class AppState extends ChangeNotifier {
   /// Resolves a shared profile link (?go=profile/<vendor-id>) against the
   /// real backend. Runs async since the constructor can't await it —
   /// silently stays on the default browse view if the id doesn't exist.
-  Future<void> _openSharedProfile(String id) async {
+  /// A shared link that fails stays quiet (the visitor lands on browse);
+  /// a tap the visitor just made gets told why nothing opened.
+  Future<void> _openSharedProfile(String id, {bool reportFailure = false}) async {
     try {
       final vendor = await _repo.vendorProfile(id);
       final normalised = _normaliseVendor(vendor);
@@ -728,6 +938,7 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     } catch (_) {
       // unknown/invalid id — stay on the default browse view
+      if (reportFailure) showToast('Couldn\'t open that profile', 'Check your connection and try again', '⚠️');
     }
   }
 
@@ -771,7 +982,28 @@ class AppState extends ChangeNotifier {
       }).toList();
     }
 
-    return items;
+    if (verifiedOnly) items = items.where((v) => v['verified'] == true).toList();
+
+    num n(dynamic v) => v is num ? v : 0;
+    return switch (sortBy) {
+      'rating' => _stableSort(items, (a, b) => n(b['rating']).compareTo(n(a['rating']))),
+      'bookings' => _stableSort(items, (a, b) => n(b['reviewCount']).compareTo(n(a['reviewCount']))),
+      'new' => _stableSort(items, (a, b) => (b['isNew'] == true ? 1 : 0).compareTo(a['isNew'] == true ? 1 : 0)),
+      _ => items,
+    };
+  }
+
+  /// List.sort makes no stability promise, and ties (every new face has a
+  /// 0.0 rating) must keep the backend's order or the grid reshuffles on
+  /// every rebuild.
+  static List<Map<String, dynamic>> _stableSort(
+      List<Map<String, dynamic>> items, int Function(Map<String, dynamic>, Map<String, dynamic>) cmp) {
+    final indexed = [for (var i = 0; i < items.length; i++) (i, items[i])];
+    indexed.sort((a, b) {
+      final c = cmp(a.$2, b.$2);
+      return c != 0 ? c : a.$1.compareTo(b.$1);
+    });
+    return [for (final e in indexed) e.$2];
   }
 
   /// True when the grid is empty only because a filter is on — so the empty
@@ -786,6 +1018,7 @@ class AppState extends ChangeNotifier {
     _apiListings = null; // clear so UI shows a loading state while re-fetching
     notifyListeners();
     fetchListings();
+    fetchFeaturedTalent();
   }
 
   /// Free-text search. Filters locally and, when the term looks like a place,
