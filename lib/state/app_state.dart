@@ -1133,10 +1133,10 @@ class AppState extends ChangeNotifier {
   }
 
   /// Pays the advance/deposit via the backend when the user is signed in.
-  Future<bool> payAdvanceApi(String bookingId, String inquiryRef, String receiptImageUrl) async {
+  Future<bool> payAdvanceApi(String bookingId, String inquiryRef, String receiptImageUrl, {double amount = 5000}) async {
     if (!isLoggedIn) return false;
     try {
-      await _repo.payAdvance(bookingId, inquiryRef, receiptImageUrl);
+      await _repo.payAdvance(bookingId, inquiryRef, receiptImageUrl, amount: amount);
       final i = inquiries.indexWhere((q) => q.ref == inquiryRef);
       if (i != -1) {
         inquiries[i].status = 'Advance submitted';
@@ -1144,7 +1144,12 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       showToast('Advance submitted', 'Receipt sent for admin review — slot reserved once approved', '💳');
       return true;
-    } catch (_) {
+    } catch (e) {
+      showToast(
+        'Advance failed',
+        e is ApiException ? e.message : 'Could not submit receipt — try again',
+        '⚠️',
+      );
       return false;
     }
   }

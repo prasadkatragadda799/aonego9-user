@@ -29,12 +29,11 @@ class _ConnectScreenState extends State<ConnectScreen> {
     ('apply', 'Apply', '📝', 'List yourself as an artist, or your business as a vendor.'),
   ];
 
-  late String _tab = context.read<AppState>().connectTab;
-
   @override
   Widget build(BuildContext context) {
+    final tab = context.watch<AppState>().connectTab;
     final pad = isNarrow(context) ? 16.0 : 24.0;
-    final active = _tabs.firstWhere((t) => t.$1 == _tab, orElse: () => _tabs.first);
+    final active = _tabs.firstWhere((t) => t.$1 == tab, orElse: () => _tabs.first);
 
     return PageFrame(
       title: 'Connect',
@@ -59,13 +58,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
                   _TabChip(
                     label: t.$2,
                     icon: t.$3,
-                    active: _tab == t.$1,
-                    onTap: () => setState(() => _tab = t.$1),
+                    active: tab == t.$1,
+                    onTap: () => context.read<AppState>().openConnect(t.$1),
                   ),
               ],
             ),
             const SizedBox(height: 22),
-            switch (_tab) {
+            switch (tab) {
               'join' => const _JoinForm(),
               'apply' => const _ApplyForm(),
               _ => const _ContactForm(),

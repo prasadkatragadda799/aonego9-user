@@ -239,11 +239,16 @@ class UserRepository {
   }
 
   // POST /api/v1/bookings/advance — submit advance with receipt for admin approval
-  Future<Map<String, dynamic>> payAdvance(String bookingId, String inquiryRef, String receiptImageUrl) async {
+  Future<Map<String, dynamic>> payAdvance(
+    String bookingId,
+    String inquiryRef,
+    String receiptImageUrl, {
+    double amount = 5000,
+  }) async {
     final data = await ApiClient.post('/bookings/advance', {
       'booking_id': bookingId,
       'inquiry_ref': inquiryRef,
-      'amount': 5000,
+      'amount': amount,
       'method': 'UPI',
       'receipt_image': receiptImageUrl,
     });
@@ -257,15 +262,10 @@ class UserRepository {
     return ApiClient.asList(await ApiClient.get('/events'));
   }
 
-  // GET /api/v1/cms/newsletters — published digest (empty if the desk hasn't shipped this yet)
+  // GET /api/v1/browse/newsletters — public digest only (CMS list is admin-auth).
   Future<List<Map<String, dynamic>>> newsletters() async {
     try {
-      final data = await ApiClient.get('/cms/newsletters');
-      if (data is List || data is Map) return ApiClient.asList(data);
-    } catch (_) {}
-    try {
-      final data = await ApiClient.get('/browse/newsletters');
-      if (data is List || data is Map) return ApiClient.asList(data);
+      return ApiClient.asList(await ApiClient.get('/browse/newsletters', auth: false));
     } catch (_) {}
     return const [];
   }
@@ -300,7 +300,6 @@ class UserRepository {
 
   // GET /api/v1/bookings/me
   Future<List<Map<String, dynamic>>> myBookings() async {
-    // A bare array (no `items` envelope) used to throw a cast error here.
     return ApiClient.asList(await ApiClient.get('/bookings/me'));
   }
 
@@ -324,7 +323,7 @@ class UserRepository {
 
   // GET /api/v1/subscriptions/payment-info (public)
   Future<Map<String, dynamic>> paymentInfo() async {
-    final data = await ApiClient.get('/subscriptions/payment-info');
+    final data = await ApiClient.get('/subscriptions/payment-info', auth: false);
     return data as Map<String, dynamic>;
   }
 
@@ -362,7 +361,7 @@ class UserRepository {
 
   /// GET /browse/ads — video and photo ad creatives for the display slots.
   Future<List<Map<String, dynamic>>> ads() =>
-      _listFrom(['/browse/ads', '/cms/ads']);
+      _listFrom(['/browse/ads']);
 
   /// GET /sessions — workshops and webinars.
   Future<List<Map<String, dynamic>>> sessions() =>
@@ -370,11 +369,11 @@ class UserRepository {
 
   /// GET /cms/partners — academic and brand partners with logo artwork.
   Future<List<Map<String, dynamic>>> partners() =>
-      _listFrom(['/cms/partners', '/browse/partners']);
+      _listFrom(['/browse/partners']);
 
-  /// GET /cms/team — the AOneGo9 desk.
+  /// GET /browse/team — the AOneGo9 desk.
   Future<List<Map<String, dynamic>>> team() =>
-      _listFrom(['/cms/team', '/browse/team']);
+      _listFrom(['/browse/team']);
 
   /// GET /browse/updates — the notification bar feed across every division.
   Future<List<Map<String, dynamic>>> updates() =>

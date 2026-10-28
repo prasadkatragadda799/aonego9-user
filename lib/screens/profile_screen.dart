@@ -84,6 +84,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _fetchVendorProfile();
   }
 
+  @override
+  void didUpdateWidget(covariant ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldId = oldWidget.profile['id']?.toString() ?? '';
+    final newId = widget.profile['id']?.toString() ?? '';
+    if (oldId == newId) return;
+    _mergedProfile = Map<String, dynamic>.from(widget.profile);
+    _leadSent = false;
+    _apiPackages = null;
+    _apiPortfolio = null;
+    _apiReviews = null;
+    _apiReviewAvg = null;
+    _detailsLoaded = false;
+    _extras = const ProfileExtras();
+    _tabs = isModel
+        ? ['Gallery', 'Comp Card', 'Work & Brands', 'Scene Availability', 'Packages', 'Reviews']
+        : isEvent
+            ? ['Overview', 'Portfolio', 'Work & Brands', 'Packages', 'Reviews']
+            : isVenue
+                ? ['Spaces', 'Portfolio', 'Work & Brands', 'Packages', 'Availability', 'Reviews']
+                : [
+                    'Portfolio',
+                    'About',
+                    'Work & Brands',
+                    if (hasEquipment) 'Equipment',
+                    'Packages',
+                    'Reviews',
+                  ];
+    _tab = _tabs.first;
+    _fetchPackages();
+    _fetchPortfolio();
+    _fetchReviews();
+    _fetchProfileDetails();
+    _fetchVendorProfile();
+  }
+
   Future<void> _fetchVendorProfile() async {
     final vendorId = widget.profile['id'] as String? ?? '';
     if (vendorId.isEmpty) return;

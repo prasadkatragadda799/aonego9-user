@@ -102,25 +102,28 @@ class ApiClient {
   static const _getTimeout = Duration(seconds: 30);
   static const _postTimeout = Duration(seconds: 45);
 
-  static Future<http.Response> _withAuthRetry(Future<http.Response> Function() send, {required bool auth}) async {
+  static Future<http.Response> _withAuthRetry(
+    Future<http.Response> Function() send, {
+    required bool auth,
+  }) async {
     var res = await send();
-    // An expired access token used to fail every authenticated call until the
-    // user signed out and back in; refresh once and replay.
     if (auth && res.statusCode == 401 && await _refreshAccessToken()) {
       res = await send();
     }
+    if (auth && res.statusCode == 401) await clearTokens();
     return res;
   }
 
-  static Future<dynamic> get(String path) async {
-    Future<http.Response> send() async =>
-        http.get(Uri.parse('$kBaseUrl$path'), headers: await _headers()).timeout(_getTimeout);
+  static Future<dynamic> get(String path, {bool auth = true}) async {
+    Future<http.Response> send() async => http
+        .get(Uri.parse('$kBaseUrl$path'), headers: await _headers(auth: auth))
+        .timeout(_getTimeout);
     try {
-      return _decode(await _withAuthRetry(send, auth: true));
+      return _decode(await _withAuthRetry(send, auth: auth));
     } on TimeoutException {
-      return _decode(await _withAuthRetry(send, auth: true));
+      return _decode(await _withAuthRetry(send, auth: auth));
     } on http.ClientException {
-      return _decode(await _withAuthRetry(send, auth: true));
+      return _decode(await _withAuthRetry(send, auth: auth));
     }
   }
 

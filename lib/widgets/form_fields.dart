@@ -69,9 +69,44 @@ class FiSelect extends StatefulWidget {
 }
 
 class _FiSelectState extends State<FiSelect> {
-  late String _val = widget.value ?? widget.options.first;
+  late String _val;
+
+  @override
+  void initState() {
+    super.initState();
+    _val = _initialValue();
+  }
+
+  @override
+  void didUpdateWidget(covariant FiSelect oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != null && widget.value != _val) {
+      setState(() => _val = widget.value!);
+    } else if (widget.options.isNotEmpty && !widget.options.contains(_val)) {
+      setState(() => _val = _initialValue());
+    }
+  }
+
+  String _initialValue() {
+    if (widget.options.isEmpty) return widget.value ?? '';
+    final v = widget.value;
+    if (v != null && widget.options.contains(v)) return v;
+    return widget.options.first;
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.options.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        decoration: BoxDecoration(
+          color: T.surf,
+          border: Border.all(color: T.bdr),
+          borderRadius: BorderRadius.circular(7),
+        ),
+        child: Text('—', style: F.syne(size: 13, color: T.dim)),
+      );
+    }
     return Container(
       decoration: BoxDecoration(
         color: T.surf,

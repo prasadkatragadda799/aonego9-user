@@ -155,7 +155,10 @@ class _Root extends StatelessWidget {
     switch (app.view) {
       case 'profile':
         if (app.selectedProfile != null) {
-          body = ProfileScreen(profile: app.selectedProfile!);
+          body = ProfileScreen(
+            key: ValueKey(app.selectedProfile!['id'] ?? ''),
+            profile: app.selectedProfile!,
+          );
           toastAccent = T.ac(app.selectedProfile!['cat'] as String?);
         } else {
           body = const BrowseScreen();

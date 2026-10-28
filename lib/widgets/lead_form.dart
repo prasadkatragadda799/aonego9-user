@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +10,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../theme/tokens.dart';
 import '../data/app_data.dart';
 import '../data/upload_service.dart';
+import '../data/api_client.dart';
 import '../data/user_repository.dart';
 import '../state/app_state.dart';
 import 'form_fields.dart';
@@ -35,6 +37,7 @@ class _LeadFormState extends State<LeadForm> {
   String? _bookingId;
   String _otpHint = '';
   bool _otpSending = false;
+  int _advanceAmount = 5000;
   late final String _ref =
       'AO9-${(Random().nextInt(1 << 30)).toRadixString(36).toUpperCase().padLeft(6, '0').substring(0, 6)}';
 
@@ -51,6 +54,16 @@ class _LeadFormState extends State<LeadForm> {
   String _budget = '';
 
   final _repo = UserRepository();
+
+  @override
+  void initState() {
+    super.initState();
+    _repo.paymentInfo().then((info) {
+      final raw = info['advance_amount'];
+      final amt = raw is num ? raw.toInt() : int.tryParse('$raw') ?? 5000;
+      if (mounted && amt > 0) setState(() => _advanceAmount = amt);
+    }).catchError((_) {});
+  }
 
   @override
   void dispose() {
@@ -86,7 +99,9 @@ class _LeadFormState extends State<LeadForm> {
       final res = await _repo.sendOtp(_phone.text.trim(), purpose: 'inquiry');
       final debug = res['debug_code'];
       setState(() {
-        _otpHint = debug != null ? 'Dev OTP: $debug' : 'OTP sent — check your phone.';
+        _otpHint = (kDebugMode && debug != null)
+            ? 'Dev OTP: $debug'
+            : 'OTP sent — check your phone.';
       });
     } catch (e) {
       setState(() => _error = 'Could not send OTP. Try again.');
@@ -113,8 +128,9 @@ class _LeadFormState extends State<LeadForm> {
         context: context,
         builder: (ctx) => _AdvancePayDialog(
           paymentInfo: payment,
+          advanceAmount: _advanceAmount,
           onSubmit: (url) async {
-            return app.payAdvanceApi(_bookingId!, _ref, url);
+            return app.payAdvanceApi(_bookingId!, _ref, url, amount: _advanceAmount.toDouble());
           },
         ),
       );
@@ -146,7 +162,8 @@ class _LeadFormState extends State<LeadForm> {
     return Column(children: [
       Text('Reserve your slot', style: F.syne(size: 12, weight: FontWeight.w700, color: T.text)),
       const SizedBox(height: 3),
-      Text('Pay a refundable ₹5,000 advance to confirm and get priority. Adjusted against your final bill.',
+      Text(
+          'Pay a refundable ₹${_advanceAmount.toStringAsFixed(0)} advance to confirm and get priority. Adjusted against your final bill.',
           textAlign: TextAlign.center, style: F.syne(size: 10.5, weight: FontWeight.w400, color: T.mut, height: 1.5)),
       const SizedBox(height: 10),
       GestureDetector(
@@ -157,7 +174,8 @@ class _LeadFormState extends State<LeadForm> {
             gradient: LinearGradient(colors: [widget.accent, T.gold]),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Text('💳  Pay ₹5,000 Advance', style: F.syne(size: 13, weight: FontWeight.w700, color: T.bg)),
+          child: Text('💳  Pay ₹${_advanceAmount.toStringAsFixed(0)} Advance',
+              style: F.syne(size: 13, weight: FontWeight.w700, color: T.bg)),
         ),
       ),
     ]);
@@ -197,11 +215,7 @@ class _LeadFormState extends State<LeadForm> {
         phoneOtp: _otpCtrl.text.trim(),
       );
       _bookingId = result['booking_id'] as String?;
-    } catch (_) {
-      // Non-blocking — inquiry is still tracked locally even if API fails
-    }
-    // Always record locally and show success
-    if (mounted) {
+      if (!mounted) return;
       context.read<AppState>().submitInquiry(
         ref: _ref,
         vendorName: widget.name,
@@ -210,6 +224,13 @@ class _LeadFormState extends State<LeadForm> {
       );
       setState(() { _done = true; _submitting = false; });
       widget.onDone?.call();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e is ApiException ? e.message : 'Could not send inquiry. Try again.';
+          _submitting = false;
+        });
+      }
     }
   }
 
@@ -360,8 +381,13 @@ class _LeadFormState extends State<LeadForm> {
 
 class _AdvancePayDialog extends StatefulWidget {
   final Map<String, dynamic> paymentInfo;
+  final int advanceAmount;
   final Future<bool> Function(String receiptUrl) onSubmit;
-  const _AdvancePayDialog({required this.paymentInfo, required this.onSubmit});
+  const _AdvancePayDialog({
+    required this.paymentInfo,
+    required this.advanceAmount,
+    required this.onSubmit,
+  });
 
   @override
   State<_AdvancePayDialog> createState() => _AdvancePayDialogState();
@@ -374,7 +400,7 @@ class _AdvancePayDialogState extends State<_AdvancePayDialog> {
   String get _upiUri {
     final upiId = widget.paymentInfo['upi_id'] ?? '';
     final payeeName = widget.paymentInfo['payee_name'] ?? '';
-    return 'upi://pay?pa=$upiId&pn=${Uri.encodeComponent(payeeName)}&am=5000&cu=INR&tn=${Uri.encodeComponent('AONEGO9 Advance')}';
+    return 'upi://pay?pa=$upiId&pn=${Uri.encodeComponent(payeeName)}&am=${widget.advanceAmount}&cu=INR&tn=${Uri.encodeComponent('AONEGO9 Advance')}';
   }
 
   Future<void> _pick() async {
@@ -406,7 +432,7 @@ class _AdvancePayDialogState extends State<_AdvancePayDialog> {
         child: Padding(
           padding: const EdgeInsets.all(22),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text('Pay ₹5,000 advance', style: F.fraunces(size: 18, weight: FontWeight.w700, color: T.text)),
+            Text('Pay ₹${widget.advanceAmount} advance', style: F.fraunces(size: 18, weight: FontWeight.w700, color: T.text)),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
