@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
 import '../data/user_repository.dart';
 import '../state/app_state.dart';
+import '../widgets/account_panels.dart';
 import '../widgets/chrome.dart';
 import '../widgets/common.dart';
 
@@ -109,6 +111,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         for (final b in _bookings!) _bookingCard(b),
                     ]),
                   ),
+                  const MessagesPanel(),
                   if (app.inquiries.isNotEmpty)
                     Blk(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -126,6 +129,7 @@ class _AccountScreenState extends State<AccountScreen> {
                           ),
                       ]),
                     ),
+                  const HelpPanel(),
                 ]),
               ),
             ),
@@ -144,8 +148,20 @@ class _AccountScreenState extends State<AccountScreen> {
         ]),
       );
 
+  static final _inr = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+
+  /// "Tue, 22 Dec 2026 · Pune" — the location is left out when the booking has none.
+  static String _bookingMeta(Map<String, dynamic> b) {
+    final d = DateTime.tryParse('${b['date'] ?? ''}');
+    final loc = '${b['location'] ?? ''}'.trim();
+    return [if (d != null) DateFormat('EEE, d MMM yyyy').format(d) else '${b['date'] ?? ''}', if (loc.isNotEmpty) loc]
+        .where((p) => p.isNotEmpty)
+        .join(' · ');
+  }
+
   Widget _bookingCard(Map<String, dynamic> b) {
     final amount = (b['amount'] as num?)?.toDouble() ?? 0;
+    final advance = (b['advance_paid'] as num?)?.toDouble() ?? 0;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -155,11 +171,18 @@ class _AccountScreenState extends State<AccountScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             Text(b['service']?.toString() ?? 'Booking', style: F.syne(size: 13, weight: FontWeight.w700, color: T.text)),
             const SizedBox(height: 3),
-            Text('${b['date'] ?? ''} · ${b['location'] ?? ''}', style: F.syne(size: 11, weight: FontWeight.w400, color: T.dim)),
+            Text(_bookingMeta(b), style: F.syne(size: 11, weight: FontWeight.w400, color: T.dim)),
           ]),
         ),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text('₹${amount.toStringAsFixed(0)}', style: F.fraunces(size: 15, weight: FontWeight.w700, color: T.gold)),
+          Text(amount > 0 ? _inr.format(amount) : 'Quote pending',
+              style: amount > 0
+                  ? F.fraunces(size: 15, weight: FontWeight.w700, color: T.gold)
+                  : F.syne(size: 12, weight: FontWeight.w600, color: T.mut)),
+          if (advance > 0) ...[
+            const SizedBox(height: 2),
+            Text('Advance ${_inr.format(advance)}', style: F.syne(size: 11, weight: FontWeight.w600, color: T.grn)),
+          ],
           const SizedBox(height: 3),
           Text('${b['status'] ?? ''}'.toUpperCase(), style: F.syne(size: 10, weight: FontWeight.w700, color: T.mut, letterSpacing: 1)),
         ]),

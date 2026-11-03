@@ -20,10 +20,13 @@ class UserRepository {
     String phone = '',
     String city = '',
     String role = 'client',
+    String phoneOtp = '',
   }) async {
     final data = await ApiClient.post('/auth/register/user', {
       'name': name, 'email': email, 'password': password,
       'phone': phone, 'city': city, 'role': role,
+      // Only needed to claim a guest account from an earlier inquiry.
+      if (phoneOtp.isNotEmpty) 'phone_otp': phoneOtp,
     }, auth: false);
     await ApiClient.saveTokens(data['access_token'], data['refresh_token']);
     return data;
@@ -234,7 +237,10 @@ class UserRepository {
       'urgent': urgent,
       'inquiry_ref': inquiryRef,
       'phone_otp': phoneOtp,
-    }, auth: false);
+      // Sent with the login when signed in, so the booking lands in the
+      // client's own account (they can follow it and pay the advance).
+      // Signed out, no token is attached and a guest record is used.
+    });
     return data as Map<String, dynamic>;
   }
 
@@ -303,6 +309,35 @@ class UserRepository {
     return ApiClient.asList(await ApiClient.get('/bookings/me'));
   }
 
+  // ── Messages — one thread per vendor, opened by an inquiry ───
+
+  // GET /api/v1/messages/me/threads
+  Future<List<Map<String, dynamic>>> myThreads() async {
+    return ApiClient.asList(await ApiClient.get('/messages/me/threads'));
+  }
+
+  // GET /api/v1/messages/me/threads/{id} — includes the messages
+  Future<Map<String, dynamic>> thread(String id) async {
+    return await ApiClient.get('/messages/me/threads/$id') as Map<String, dynamic>;
+  }
+
+  // POST /api/v1/messages/me/threads/{id}/messages
+  Future<Map<String, dynamic>> sendMessage(String threadId, String text) async {
+    return await ApiClient.post('/messages/me/threads/$threadId/messages', {'text': text}) as Map<String, dynamic>;
+  }
+
+  // ── Help desk ────────────────────────────────────────────────
+
+  // GET /api/v1/support/me
+  Future<List<Map<String, dynamic>>> myTickets() async {
+    return ApiClient.asList(await ApiClient.get('/support/me'));
+  }
+
+  // POST /api/v1/support — priority is low | medium | high
+  Future<void> raiseTicket({required String subject, required String body, String priority = 'medium'}) async {
+    await ApiClient.post('/support', {'subject': subject, 'body': body, 'priority': priority});
+  }
+
   // ── Subscriptions ────────────────────────────────────────────
 
   // GET /api/v1/subscriptions/plans?audience=user
@@ -365,7 +400,7 @@ class UserRepository {
 
   /// GET /sessions — workshops and webinars.
   Future<List<Map<String, dynamic>>> sessions() =>
-      _listFrom(['/sessions', '/events/sessions', '/cms/sessions']);
+      _listFrom(['/sessions']);
 
   /// GET /cms/partners — academic and brand partners with logo artwork.
   Future<List<Map<String, dynamic>>> partners() =>
@@ -377,7 +412,7 @@ class UserRepository {
 
   /// GET /browse/updates — the notification bar feed across every division.
   Future<List<Map<String, dynamic>>> updates() =>
-      _listFrom(['/browse/updates', '/cms/updates']);
+      _listFrom(['/browse/updates']);
 
   // ── Lead capture ──────────────────────────────────────────────
 
@@ -389,13 +424,10 @@ class UserRepository {
   /// the dedicated leads route hasn't shipped.
   Future<void> submitLead(String kind, Map<String, dynamic> payload) async {
     final body = {...payload, 'kind': kind};
-    try {
-      await ApiClient.post('/browse/leads', body, auth: false);
-      return;
-    } catch (_) {
-      // fall through
-    }
-    await ApiClient.post('/browse/newsletter/contribute', body, auth: false);
+    // /browse/leads accepts every form shape. The old fallback to the
+    // newsletter-contribution route could only ever fail validation there
+    // (it requires a headline), masking the real error.
+    await ApiClient.post('/browse/leads', body, auth: false);
   }
 
   /// POST /sessions/{id}/register — reserve a seat on a workshop or webinar.

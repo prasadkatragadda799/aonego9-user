@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../data/api_client.dart';
+import '../data/user_repository.dart';
 import '../theme/tokens.dart';
 import '../state/app_state.dart';
 import '../widgets/brand.dart';
@@ -76,6 +78,9 @@ class _UserAuthState extends State<UserAuth> {
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _password = TextEditingController();
+  final _otp = TextEditingController();
+  bool _otpSending = false;
+  String _otpHint = '';
 
   @override
   void dispose() {
@@ -83,7 +88,30 @@ class _UserAuthState extends State<UserAuth> {
     _email.dispose();
     _phone.dispose();
     _password.dispose();
+    _otp.dispose();
     super.dispose();
+  }
+
+  /// Claiming a guest account (from an inquiry sent while signed out) needs
+  /// a phone OTP — the backend asks for it with a GUEST_CLAIM response.
+  Future<void> _sendClaimOtp(AppState app) async {
+    if (_phone.text.replaceAll(RegExp(r'\D'), '').length < 10) {
+      app.showToast('Phone needed', 'Enter the mobile number you used for your inquiry', '📱');
+      return;
+    }
+    setState(() {
+      _otpSending = true;
+      _otpHint = '';
+    });
+    try {
+      final res = await UserRepository().sendOtp(_phone.text.trim(), purpose: 'register');
+      final debug = res['debug_code'];
+      if (mounted) setState(() => _otpHint = debug != null ? 'Dev OTP: $debug' : 'OTP sent — it expires in a few minutes.');
+    } catch (e) {
+      app.showToast('Could not send OTP', e is ApiException ? e.message : 'Try again in a moment', '⚠️');
+    } finally {
+      if (mounted) setState(() => _otpSending = false);
+    }
   }
 
   Future<void> _submit(AppState app) async {
@@ -92,7 +120,13 @@ class _UserAuthState extends State<UserAuth> {
       return;
     }
     final ok = _register
-        ? await app.registerUser(name: _name.text.trim(), email: _email.text.trim(), password: _password.text, phone: _phone.text.trim())
+        ? await app.registerUser(
+            name: _name.text.trim(),
+            email: _email.text.trim(),
+            password: _password.text,
+            phone: _phone.text.trim(),
+            phoneOtp: _otp.text.trim(),
+          )
         : await app.loginUser(_email.text.trim(), _password.text);
     if (ok) app.setView('browse');
   }
@@ -163,8 +197,27 @@ class _UserAuthState extends State<UserAuth> {
                           Field('Email', Fi('you@example.com', keyboardType: TextInputType.emailAddress, controller: _email)),
                           const SizedBox(height: 11),
                           if (_register) ...[
-                            Field('Phone (optional)', Fi('+91 98765 43210', keyboardType: TextInputType.phone, controller: _phone)),
+                            Field(app.guestClaimRequired ? 'Phone used for your inquiry' : 'Phone (optional)',
+                                Fi('+91 98765 43210', keyboardType: TextInputType.phone, controller: _phone)),
                             const SizedBox(height: 11),
+                            if (app.guestClaimRequired) ...[
+                              Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                                Expanded(child: Field('OTP', Fi('6-digit code', keyboardType: TextInputType.number, controller: _otp))),
+                                const SizedBox(width: 10),
+                                SizedBox(
+                                  height: 44,
+                                  child: OutlinedButton(
+                                    onPressed: _otpSending ? null : () => _sendClaimOtp(app),
+                                    child: Text(_otpSending ? 'Sending…' : 'Send OTP', style: F.syne(size: 12, weight: FontWeight.w700, color: T.gold)),
+                                  ),
+                                ),
+                              ]),
+                              if (_otpHint.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(_otpHint, style: F.syne(size: 11, color: T.gold)),
+                              ],
+                              const SizedBox(height: 11),
+                            ],
                           ],
                           Field('Password', Fi('••••••••', obscure: true, controller: _password)),
                           if (app.authError != null) ...[

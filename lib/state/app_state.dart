@@ -266,18 +266,23 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Set when sign-up hit an email that has guest inquiries — the auth
+  /// screen then asks for the inquiry's phone and an OTP to claim it.
+  bool guestClaimRequired = false;
+
   Future<bool> registerUser({
     required String name,
     required String email,
     required String password,
     String phone = '',
     String city = '',
+    String phoneOtp = '',
   }) async {
     authBusy = true;
     authError = null;
     notifyListeners();
     try {
-      await _repo.register(name: name, email: email, password: password, phone: phone, city: city);
+      await _repo.register(name: name, email: email, password: password, phone: phone, city: city, phoneOtp: phoneOtp);
       currentUser = await _repo.myProfile();
       authBusy = false;
       view = 'browse';
@@ -286,7 +291,8 @@ class AppState extends ChangeNotifier {
       return true;
     } catch (e) {
       authBusy = false;
-      authError = e is ApiException ? e.message : 'Registration failed — please try again';
+      authError = e is ApiException ? e.message.replaceFirst('GUEST_CLAIM: ', '') : 'Registration failed — please try again';
+      guestClaimRequired = e is ApiException && e.message.startsWith('GUEST_CLAIM');
       notifyListeners();
       return false;
     }
@@ -788,35 +794,6 @@ class AppState extends ChangeNotifier {
   }
 
   /// Submit inquiry to the backend, then record locally.
-  Future<void> submitInquiryApi({
-    required String vendorId,
-    required String vendorName,
-    required String ref,
-    required String cat,
-    required bool urgent,
-    required String email,
-    required String phone,
-    required String date,
-    String message = '',
-  }) async {
-    try {
-      await _repo.submitInquiry(
-        vendorId: vendorId,
-        category: cat,
-        name: vendorName,
-        email: email,
-        phone: phone,
-        date: date,
-        inquiryRef: ref,
-        message: message,
-        urgent: urgent,
-      );
-    } catch (_) {
-      // non-blocking — inquiry is recorded locally regardless
-    }
-    submitInquiry(ref: ref, vendorName: vendorName, cat: cat, urgent: urgent);
-  }
-
   /// ── Reach / share analytics ───────────────────────────────────
   /// Session-only counters — no seeded fake bases.
   final Map<String, int> _views = {};
