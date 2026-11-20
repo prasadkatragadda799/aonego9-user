@@ -23,6 +23,19 @@ class NewsletterIssue {
   /// industry a story belongs to, not only by happening/trend.
   final String vertical;
 
+  /// Country the story is from. Empty or India = domestic; anything else is
+  /// shown under "International".
+  final String country;
+
+  /// 'city' | 'india' | 'international' — where the story belongs.
+  String get scope {
+    final c = country.trim().toLowerCase();
+    if (c.isNotEmpty && c != 'india' && c != 'in') return 'international';
+    final ci = city.trim().toLowerCase();
+    if (ci.isEmpty || ci == 'india' || ci == 'all india' || ci == 'pan india' || ci == 'national') return 'india';
+    return 'city';
+  }
+
   const NewsletterIssue({
     required this.id,
     required this.kind,
@@ -37,6 +50,7 @@ class NewsletterIssue {
     this.imageUrl,
     this.author = 'AOneGo9 Desk',
     this.vertical = 'all',
+    this.country = '',
   });
 
   factory NewsletterIssue.fromJson(Map<String, dynamic> j) {
@@ -59,6 +73,9 @@ class NewsletterIssue {
         bg: (j['bg'] as num?)?.toInt() ?? 0,
         imageUrl: (j['image_url'] as String?)?.trim().isNotEmpty == true ? j['image_url'] as String : null,
         author: j['author'] as String? ?? j['author_name'] as String? ?? 'AOneGo9 Desk',
+        country: (j['country'] as String? ??
+                ((j['scope'] as String? ?? j['region'] as String? ?? '').toLowerCase().contains('inter') ? 'International' : ''))
+            .trim(),
         // Trust the desk's own tagging; infer only when it hasn't tagged one,
         // so the filter is useful before the backend ships the field.
         vertical: newsVerticals.any((v) => v.id == declared) && declared != 'all'
@@ -81,6 +98,7 @@ class NewsletterIssue {
         'image_url': imageUrl,
         'author': author,
         'vertical': vertical,
+        'country': country,
       };
 }
 

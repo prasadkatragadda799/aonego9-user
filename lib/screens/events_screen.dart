@@ -2,34 +2,67 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
 import '../state/app_state.dart';
+import '../data/programs.dart';
 import '../widgets/chrome.dart';
 import '../services/link_service.dart';
 import '../widgets/common.dart';
 import '../widgets/form_fields.dart';
+import '../widgets/program_kit.dart';
 
-class EventsScreen extends StatelessWidget {
+/// Events — live events, fashion shows, entertainment, workshops and
+/// webinars, split into the two sectors the platform keeps apart:
+/// entertainment and education.
+class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
+
+  @override
+  State<EventsScreen> createState() => _EventsScreenState();
+}
+
+class _EventsScreenState extends State<EventsScreen> {
+  String _sector = 'all';
+  String _type = 'All';
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final pad = isNarrow(context) ? 16.0 : 24.0;
-    final events = app.platformEvents;
+    final all = app.platformEvents;
+    final events = all
+        .where((e) => _sector == 'all' || eventSectorOf(e) == _sector)
+        .where((e) => eventMatchesType(e, _type))
+        .toList();
+    final sessionsInSector = _sector == 'education' ? app.sessions.length : 0;
     return PageFrame(
       title: 'Events',
       body: Padding(
         padding: EdgeInsets.fromLTRB(pad, 0, pad, 48),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const PageIntro(
               eyebrow: 'On the calendar',
               motif: 'crew',
-              title: 'Castings, open houses, weeks.',
-              dek: 'Live and upcoming AOneGo9 events. Anything marked on the poster also runs in the red LIVE bar at the top of browse.',
+              title: 'Live events, shows, workshops & webinars.',
+              dek: 'Fashion shows, entertainment programmes, castings, fests and education sessions from AOneGo9 and '
+                  'third-party organisations — with tickets, registrations and participation in one tap.',
             ),
-            const SizedBox(height: 8),
-            if (app.eventsLoading && events.isEmpty)
+            const SizedBox(height: 16),
+            SegTabs(
+              tabs: const [
+                ('all', 'All sectors', '🗓️'),
+                ('entertainment', 'Entertainment', '🎤'),
+                ('education', 'Education', '🎓'),
+              ],
+              active: _sector,
+              onChanged: (v) => setState(() => _sector = v),
+            ),
+            const SizedBox(height: 12),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final t in eventTypes) PickChip(label: t, active: _type == t, onTap: () => setState(() => _type = t)),
+            ]),
+            const SizedBox(height: 16),
+            if (app.eventsLoading && all.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 60),
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: T.gold)),
@@ -37,10 +70,21 @@ class EventsScreen extends StatelessWidget {
             else if (events.isEmpty)
               EmptyState(
                 icon: Icons.event_outlined,
-                title: 'No events on the calendar yet',
-                message: 'Castings, open houses and weeks appear here as soon as the desk posts them.',
-                actionLabel: 'Get the digest',
-                onAction: () => app.setView('newsletter'),
+                title: all.isEmpty ? 'No events on the calendar yet' : 'No events match these filters',
+                message: all.isEmpty
+                    ? 'Castings, fashion shows, fests and workshops appear here as soon as organisers publish them.'
+                    : (sessionsInSector > 0
+                        ? '$sessionsInSector workshop${sessionsInSector == 1 ? '' : 's'} and webinars are open on the sessions page.'
+                        : 'Try another sector or event type.'),
+                actionLabel: all.isEmpty ? 'Get the digest' : (sessionsInSector > 0 ? 'Open sessions' : 'Clear filters'),
+                onAction: all.isEmpty
+                    ? () => app.setView('newsletter')
+                    : (sessionsInSector > 0
+                        ? () => app.setView('sessions')
+                        : () => setState(() {
+                              _sector = 'all';
+                              _type = 'All';
+                            })),
               )
             else
               LayoutBuilder(builder: (context, bc) {
@@ -55,11 +99,55 @@ class EventsScreen extends StatelessWidget {
                   ],
                 );
               }),
+            const SectionTitle('More on the calendar'),
+            AutoGrid(minItemWidth: 230, gap: 12, children: [
+              _LinkCard(icon: '🎓', title: 'Workshops & webinars', body: 'Seats with a host, a fee and a capacity.', onTap: () => app.setView('sessions')),
+              _LinkCard(icon: '🏫', title: 'AOneGo9 Open School', body: 'Courses, intakes and admission forms.', onTap: () => app.setView('academy')),
+              _LinkCard(icon: '🎪', title: 'Publish your event', body: 'Organisers: sell tickets and manage registrations.', onTap: () => app.openOnboard('organiser')),
+              _LinkCard(icon: '✨', title: 'Plan an event', body: 'AI-assisted budget, timeline and guest notebook.', onTap: () => app.setView('planner')),
+            ]),
           ],
         ),
       ),
     );
   }
+}
+
+class _LinkCard extends StatelessWidget {
+  final String icon;
+  final String title;
+  final String body;
+  final VoidCallback onTap;
+  const _LinkCard({required this.icon, required this.title, required this.body, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label: title,
+        child: HoverFx(
+          onTap: onTap,
+          builder: (h) => AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: T.card,
+              border: Border.all(color: h ? T.gold : T.bdr),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(icon, style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: F.syne(size: 13.5, weight: FontWeight.w800, color: T.cream)),
+                  const SizedBox(height: 3),
+                  Text(body, style: F.syne(size: 11.5, color: T.dim, height: 1.4)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      );
 }
 
 class _EventCard extends StatelessWidget {
@@ -106,6 +194,7 @@ class _EventCard extends StatelessWidget {
                     runSpacing: 6,
                     children: [
                       _Pill(text: '${event['status'] ?? 'upcoming'}'.toUpperCase(), gold: false),
+                      _Pill(text: eventSectorOf(event).toUpperCase(), gold: false),
                       if (onPoster) const _Pill(text: 'ON POSTER', gold: true),
                     ],
                   ),

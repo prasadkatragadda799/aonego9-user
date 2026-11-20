@@ -23,8 +23,13 @@ class LogoPartner {
   /// Jewellery…). For academic partners: the stream they teach.
   final String division;
   final String city;
+  final String state;
+  final String country;
   final String website;
   final int bg;
+
+  /// Sponsor tier (title / gold / silver / media…) — free text from the desk.
+  final String sponsorLevel;
   const LogoPartner({
     required this.name,
     required this.tagline,
@@ -32,9 +37,17 @@ class LogoPartner {
     required this.division,
     this.logoUrl = '',
     this.city = '',
+    this.state = '',
+    this.country = 'India',
     this.website = '',
     this.bg = 0,
+    this.sponsorLevel = '',
   });
+
+  bool get isInternational {
+    final c = country.trim().toLowerCase();
+    return c.isNotEmpty && c != 'india' && c != 'in';
+  }
 
   factory LogoPartner.fromJson(Map<String, dynamic> j) => LogoPartner(
         name: j['name'] as String? ?? '',
@@ -47,8 +60,11 @@ class LogoPartner {
         division: j['division'] as String? ?? j['category'] as String? ?? 'General',
         logoUrl: (j['logo_url'] as String?)?.trim() ?? '',
         city: j['city'] as String? ?? '',
+        state: j['state'] as String? ?? '',
+        country: (j['country'] as String? ?? 'India').trim().isEmpty ? 'India' : (j['country'] as String).trim(),
         website: j['website'] as String? ?? '',
         bg: (j['bg'] as num?)?.toInt() ?? 0,
+        sponsorLevel: j['sponsor_level'] as String? ?? j['level'] as String? ?? '',
       );
 }
 

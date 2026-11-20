@@ -19,7 +19,7 @@ import 'reels_viewer.dart' show showReelsViewer;
 ///   [PromoStrip]          slim advertisement strip under the search
 ///   (spotlight reel)      the big video / poster advertisement
 ///   [ListingProfiles]     Artists | Business & Vendors, all types
-///   [QuickTiles]          Live events, fashion weeks, workshops, castings…
+///   [QuickTiles]          Events, shoots, campaigns, Open School, planner…
 ///   [UpdatesFolders]      AOneGo9 — Events / Academic / Updates, photo + video
 ///   [ServiceProviders]    "Browse service providers" picture grid
 ///   [ReelsCarousel]       stacked reels — video ads and advertisements
@@ -33,10 +33,16 @@ import 'reels_viewer.dart' show showReelsViewer;
 const List<String> artistCatIds = [
   'modelF',
   'modelM',
+  'celebrity',
+  'influencer',
+  'director',
+  'castingDirector',
+  'expert',
   'photo',
   'video',
   'makeupArtist',
   'designer',
+  'coach',
   'editVideo',
   'editVfx',
   'edit3d',
@@ -47,12 +53,20 @@ const List<String> artistCatIds = [
 const List<String> vendorCatIds = [
   'studio',
   'events',
+  'productionHouse',
+  'agency',
+  'organiser',
   'venue',
   'makeupStudio',
   'clothShop',
   'jewellery',
+  'brand',
+  'mall',
+  'adAgency',
+  'localVendor',
   'hotel',
   'academy',
+  'college',
 ];
 
 List<Cat> _cats(List<String> ids) => ids.map(catOf).whereType<Cat>().toList();
@@ -393,21 +407,24 @@ class _Tile {
   const _Tile(this.emoji, this.label, this.motif, this.onTap);
 }
 
-/// The three-by-three block of shortcuts from the sketch.
+/// The block of shortcuts from the sketch — every programme one tap away.
 class QuickTiles extends StatelessWidget {
   final AppState app;
   const QuickTiles({super.key, required this.app});
 
   static final _tiles = <_Tile>[
     _Tile('🎤', 'Live Events', 'crew', (c, a) => a.setView('events')),
-    _Tile('👠', 'Fashion Weeks', 'fashion', (c, a) => a.setView('events')),
+    _Tile('👠', 'Fashion Shows', 'fashion', (c, a) => a.setView('events')),
+    _Tile('📸', 'Portfolio & Personal Shoots', 'talent', (c, a) => a.openShoots()),
+    _Tile('🗳️', 'Campaigns & Offers', 'fashion', (c, a) => a.openCampaigns()),
+    _Tile('🌟', 'Stars & Experts', 'stars', (c, a) => a.openResults(division: 'stars')),
+    _Tile('✦', 'Artist Portfolios', 'talent', (c, a) => a.openResults(division: 'talent')),
     _Tile('🎓', 'Workshops & Webinars', 'education', (c, a) => a.setView('sessions')),
-    _Tile('📣', 'Casting Updates', 'talent', (c, a) => a.setView('newsletter')),
-    _Tile('📸', 'Artist Portfolios', 'talent', (c, a) => a.openResults(division: 'talent')),
-    _Tile('🏫', 'Academic Programs', 'education', (c, a) => a.openResults(cat: 'academy')),
+    _Tile('🏫', 'Open School', 'education', (c, a) => a.setView('academy')),
+    _Tile('✨', 'AI Event Planner', 'crew', (c, a) => a.setView('planner')),
     _Tile('💍', 'Wedding Planning', 'beauty', (c, a) => a.setView('wedding')),
+    _Tile('🏢', 'List Your Business', 'business', (c, a) => a.openOnboard()),
     _Tile('✚', 'More Options', 'post', (c, a) => showAllCategories(c, a)),
-    _Tile('🏢', 'Vendors', 'spaces', (c, a) => showAllCategories(c, a, only: vendorCatIds)),
   ];
 
   @override
@@ -416,7 +433,7 @@ class QuickTiles extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.fromLTRB(_pad(context), 14, _pad(context), 0),
       child: LayoutBuilder(builder: (context, bc) {
-        final cols = bc.maxWidth >= 900 ? 9 : (bc.maxWidth >= 560 ? 5 : 3);
+        final cols = bc.maxWidth >= 900 ? 6 : (bc.maxWidth >= 560 ? 4 : 3);
         const gap = 10.0;
         final w = (bc.maxWidth - gap * (cols - 1)) / cols;
         return Wrap(

@@ -41,6 +41,17 @@ class HubScreen extends StatelessWidget {
         ? <Widget>[
             IndustryExperts(app: app),
             HubBand(
+              title: 'Stars, directors & creators',
+              tint: const Color(0xFFFFF0C8),
+              items: const [
+                ('celebrity', 'Celebrities', '🌟'),
+                ('director', 'Directors', '🎬'),
+                ('castingDirector', 'Casting Directors', '🎭'),
+                ('influencer', 'Influencers', '📱'),
+              ],
+              onOpen: open,
+            ),
+            HubBand(
               title: 'On camera — models & talent',
               tint: const Color(0xFFF7D9DF),
               items: const [
@@ -90,10 +101,20 @@ class HubScreen extends StatelessWidget {
               items: const [
                 ('edit3d', '3D & Animation', '🧊'),
                 ('editGraphic', 'Graphic Designers', '🎨'),
-                ('photo', 'Portfolio Shoots', '🖼️'),
-                ('video', 'Showreels', '📽️'),
+                ('expert', 'Industry Experts', '🧠'),
+                ('coach', 'Teachers & Choreographers', '💃'),
               ],
               onOpen: open,
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(pad, 22, pad, 0),
+              child: HubPromo(
+                title: 'Book a portfolio or personal shoot',
+                sub: 'Crew, wardrobe, schedule and edit — handled by the AOneGo9 desk',
+                cta: 'Plan my shoot',
+                emoji: '📸',
+                onTap: () => app.openShoots(),
+              ),
             ),
           ]
         : <Widget>[
@@ -130,6 +151,40 @@ class HubScreen extends StatelessWidget {
                 ('academy', 'Academies', '🎓'),
               ],
               onOpen: open,
+            ),
+            HubBand(
+              title: 'Brands, malls & agencies',
+              tint: const Color(0xFFEDE6D2),
+              items: const [
+                ('brand', 'Brands & Sponsors', '🏷️'),
+                ('mall', 'Malls & Retail', '🛍️'),
+                ('adAgency', 'Ad & Social Agencies', '📣'),
+                ('localVendor', 'Local Vendors', '🧰'),
+              ],
+              onOpen: open,
+            ),
+            HubBand(
+              title: 'Production, agencies & institutions',
+              tint: const Color(0xFFDDE7F3),
+              items: const [
+                ('productionHouse', 'Production Houses', '🎥'),
+                ('agency', 'Modelling Agencies', '🗂️'),
+                ('organiser', 'Show Organisers', '🎤'),
+                ('college', 'Colleges & Universities', '🏫'),
+              ],
+              onOpen: open,
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(pad, 22, pad, 0),
+              child: HubPromo(
+                title: 'List your business on AOneGo9',
+                sub: 'Inventory, tickets, registrations and promotion in one panel',
+                cta: 'Start onboarding',
+                emoji: '🏢',
+                ground: const Color(0xFF0E3B3A),
+                accent: T.marigold,
+                onTap: () => app.openOnboard(),
+              ),
             ),
             Padding(
               padding: EdgeInsets.fromLTRB(pad, 22, pad, 0),

@@ -61,12 +61,12 @@ class _DivisionFxState extends State<DivisionFx> with SingleTickerProviderStateM
   }
 
   static int _periodMs(String id) => switch (id) {
-        'talent' => 5200,
+        'talent' || 'stars' => 5200,
         'crew' => 4000,
         'post' => 4600,
         'beauty' => 3600,
         'fashion' => 6000,
-        'spaces' => 5600,
+        'spaces' || 'business' => 5600,
         'hospitality' => 5000,
         _ => 4800,
       };
@@ -133,7 +133,7 @@ class _FxPainter extends CustomPainter {
     canvas.save();
     canvas.clipRect(Offset.zero & s);
     switch (id) {
-      case 'talent':
+      case 'talent' || 'stars':
         _spotlight(canvas, s);
       case 'crew':
         _filmStrip(canvas, s);
@@ -143,7 +143,7 @@ class _FxPainter extends CustomPainter {
         _sparkles(canvas, s);
       case 'fashion':
         _threads(canvas, s);
-      case 'spaces':
+      case 'spaces' || 'business':
         _blueprint(canvas, s);
       case 'hospitality':
         _steam(canvas, s);

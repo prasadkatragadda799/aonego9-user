@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/directory.dart';
+import '../data/geo.dart';
 import '../services/link_service.dart';
 import '../state/app_state.dart';
 import '../theme/tokens.dart';
@@ -8,6 +9,7 @@ import '../widgets/chrome.dart';
 import '../widgets/common.dart';
 import '../widgets/form_fields.dart';
 import '../widgets/logo_mark.dart';
+import '../widgets/program_kit.dart';
 
 /// Partners — two logo walls, as the brief splits them:
 ///   · "our academic partners show to logo display"
@@ -27,12 +29,29 @@ class PartnersScreen extends StatefulWidget {
 class _PartnersScreenState extends State<PartnersScreen> {
   String _division = 'All';
 
+  /// Where sponsors are listed: all | city | state | india | international.
+  String _scope = 'all';
+
+  bool _inScope(LogoPartner p, String location) {
+    final state = p.state.isNotEmpty ? p.state : GeoIndex.stateOfCity(p.city);
+    return switch (_scope) {
+      'city' => !p.isInternational && (p.city.isEmpty || GeoIndex.matches(selected: location, listingCity: p.city)),
+      'state' => !p.isInternational &&
+          (state.isEmpty || state.toLowerCase() == (GeoIndex.isState(location) ? location : GeoIndex.stateOfCity(location)).toLowerCase()),
+      'india' => !p.isInternational,
+      'international' => p.isInternational,
+      _ => true,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final pad = isNarrow(context) ? 16.0 : 24.0;
     final academic = app.academicPartners;
-    final brands = app.brandPartners;
+    final allBrands = app.brandPartners;
+    final brands = allBrands.where((b) => _inScope(b, app.location)).toList();
+    final locState = GeoIndex.isState(app.location) ? app.location : GeoIndex.stateOfCity(app.location);
 
     // Only offer divisions that actually have a partner behind them.
     final presentDivisions = <String>{for (final b in brands) b.division};
@@ -63,11 +82,23 @@ class _PartnersScreenState extends State<PartnersScreen> {
 
             // ── Brand partners ──
             _WallHeader(
-              eyebrow: 'Top brand partners',
+              eyebrow: 'Top brand partners & sponsors',
               title: 'Brands that book here',
               count: brands.length,
             ),
             const SizedBox(height: 14),
+            // Sponsors and brands listed by city, state and country.
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final sc in [
+                ('all', 'Everywhere', '🌐'),
+                if (app.location != kAllIndia && GeoIndex.isCity(app.location)) ('city', app.location, '📍'),
+                if (locState.isNotEmpty) ('state', locState, '🗺️'),
+                ('india', 'India', '🇮🇳'),
+                ('international', 'International', '✈️'),
+              ])
+                PickChip(label: sc.$2, icon: sc.$3, active: _scope == sc.$1, onTap: () => setState(() => _scope = sc.$1)),
+            ]),
+            const SizedBox(height: 10),
             Wrap(spacing: 6, runSpacing: 6, children: [
               for (final d in divisionChips)
                 _DivChip(
@@ -77,7 +108,24 @@ class _PartnersScreenState extends State<PartnersScreen> {
                 ),
             ]),
             const SizedBox(height: 16),
-            _LogoWall(partners: shownBrands, showDivision: _division == 'All'),
+            if (shownBrands.isEmpty && allBrands.isNotEmpty)
+              EmptyState(
+                icon: Icons.storefront_outlined,
+                title: 'No sponsors listed here yet',
+                message: 'Try another location or division — or list your brand for this market.',
+                actionLabel: 'Show everywhere',
+                onAction: () => setState(() {
+                  _scope = 'all';
+                  _division = 'All';
+                }),
+              )
+            else
+              _LogoWall(partners: shownBrands, showDivision: _division == 'All'),
+            const SizedBox(height: 16),
+            Wrap(spacing: 10, runSpacing: 10, children: [
+              OutlineBtn('Browse brands & sponsors', icon: Icons.storefront_outlined, onTap: () => app.openResults(cat: 'brand')),
+              OutlineBtn('Become a sponsor', icon: Icons.workspace_premium_outlined, onTap: () => app.openOnboard('brand')),
+            ]),
 
             const SizedBox(height: 44),
 

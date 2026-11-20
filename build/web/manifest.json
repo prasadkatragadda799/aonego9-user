@@ -1,11 +1,11 @@
 {
-    "name": "AOneGo9 — Modeling Agency & Production House",
+    "name": "AOneGo9 — Artists, Businesses, Events & Brands",
     "short_name": "AOneGo9",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FBF6EC",
     "theme_color": "#8C1D2E",
-    "description": "Browse verified models, venues, photographers, videographers and event services across India. Full portfolios and pricing before you reach out.",
+    "description": "AOneGo9 connects artists, businesses, vendors, organisations, schools, media partners, sponsors and customers — portfolios, shoots, events, campaigns, advertising and AI-assisted planning across India.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

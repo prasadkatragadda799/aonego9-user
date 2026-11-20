@@ -52,7 +52,7 @@ class SiteFooter extends StatelessWidget {
                           const BrandLogo(size: 24, variant: LogoVariant.full),
                           const SizedBox(height: 16),
                           Text(
-                            'India\'s curated marketplace for verified talent, crews, studios, '
+                            'India\'s platform for artists, businesses, organisations, brands, media and institutions — talent, crews, studios, '
                             'designers, venues, stays and academies. Browse full portfolios and '
                             'pricing before you reach out.',
                             style: F.syne(size: 12.5, weight: FontWeight.w400, color: T.mut, height: 1.7),
@@ -111,6 +111,10 @@ class SiteFooter extends StatelessWidget {
                         _Link(label: 'Industry news', accent: T.gold, onTap: () => app.setView('newsletter')),
                         _Link(label: 'Events', accent: T.gold, onTap: () => app.setView('events')),
                         _Link(label: 'Workshops & webinars', accent: T.gold, onTap: () => app.setView('sessions')),
+                        _Link(label: 'Shoots', accent: T.gold, onTap: () => app.openShoots()),
+                        _Link(label: 'Campaigns & offers', accent: T.gold, onTap: () => app.openCampaigns()),
+                        _Link(label: 'Open School', accent: T.gold, onTap: () => app.setView('academy')),
+                        _Link(label: 'Event planner', accent: T.gold, onTap: () => app.setView('planner')),
                         _Link(label: 'Partners', accent: T.gold, onTap: () => app.setView('partners')),
                         _Link(label: 'About', accent: T.gold, onTap: () => app.setView('about')),
                         _Link(label: 'Our team', accent: T.gold, onTap: () => app.setView('team')),
@@ -123,7 +127,7 @@ class SiteFooter extends StatelessWidget {
                         _Link(label: 'Contact us', accent: T.gold, onTap: () => app.openConnect('contact')),
                         _Link(label: 'Join us', accent: T.gold, onTap: () => app.openConnect('join')),
                         _Link(label: 'Apply as artist', accent: T.gold, onTap: () => app.openConnect('apply')),
-                        _Link(label: 'List your business', accent: T.gold, onTap: () => app.openConnect('apply')),
+                        _Link(label: 'List your business', accent: T.gold, onTap: () => app.openOnboard()),
                       ],
                     ),
                     _Col(

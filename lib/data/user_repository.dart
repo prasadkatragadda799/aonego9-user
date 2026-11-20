@@ -414,6 +414,58 @@ class UserRepository {
   Future<List<Map<String, dynamic>>> updates() =>
       _listFrom(['/browse/updates']);
 
+  /// GET /browse/campaigns — upcoming campaigns open for interest and votes.
+  Future<List<Map<String, dynamic>>> campaigns() =>
+      _listFrom(['/browse/campaigns']);
+
+  /// GET /browse/offers — offers & coupons for campaigns and artist services.
+  Future<List<Map<String, dynamic>>> offers() =>
+      _listFrom(['/browse/offers']);
+
+  /// GET /academy/courses — Open School programmes.
+  Future<List<Map<String, dynamic>>> courses() =>
+      _listFrom(['/academy/courses']);
+
+  /// POST /browse/campaigns/{id}/vote. Falls back to the leads desk, which
+  /// already accepts every form shape, so a vote is never silently lost.
+  Future<void> voteCampaign(String id, Map<String, dynamic> payload) async {
+    try {
+      // Short cap: a dedicated route that isn't deployed must not hold the
+      // visitor for the client's full 45s POST timeout before the fallback.
+      await ApiClient.post('/browse/campaigns/$id/vote', payload, auth: false).timeout(const Duration(seconds: 10));
+    } catch (_) {
+      await submitLead('campaign_vote', {...payload, 'campaign_id': id});
+    }
+  }
+
+  /// POST /browse/campaigns/{id}/interest — city-wise interest registration.
+  Future<void> registerCampaignInterest(String id, Map<String, dynamic> payload) async {
+    try {
+      await ApiClient.post('/browse/campaigns/$id/interest', payload, auth: false).timeout(const Duration(seconds: 10));
+    } catch (_) {
+      await submitLead('campaign_interest', {...payload, 'campaign_id': id});
+    }
+  }
+
+  /// POST /ai/event-plan — the AI planner. Returns null when the endpoint is
+  /// not available so the caller can fall back to the on-device planner.
+  Future<Map<String, dynamic>?> aiEventPlan(Map<String, dynamic> brief) async {
+    try {
+      // The planner is interactive — if the AI doesn't answer quickly, the
+      // on-device plan is shown instead of a spinner.
+      final data = await ApiClient.post('/ai/event-plan', brief, auth: false).timeout(const Duration(seconds: 6));
+      return data is Map<String, dynamic> ? data : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// PUT-equivalent: POST /users/me/notification-preferences. Best effort —
+  /// preferences are also kept on the device.
+  Future<void> saveNotificationPrefs(Map<String, bool> prefs) async {
+    await ApiClient.post('/users/me/notification-preferences', {'streams': prefs});
+  }
+
   // ── Lead capture ──────────────────────────────────────────────
 
   /// POST /browse/leads — contact, join-us and apply forms.

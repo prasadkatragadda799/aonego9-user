@@ -19,6 +19,11 @@ import 'screens/connect_screen.dart';
 import 'screens/wedding_screen.dart';
 import 'screens/advertise_screen.dart';
 import 'screens/hub_screen.dart';
+import 'screens/shoots_screen.dart';
+import 'screens/campaigns_screen.dart';
+import 'screens/onboard_screen.dart';
+import 'screens/academy_screen.dart';
+import 'screens/planner_screen.dart';
 import 'widgets/app_drawer.dart';
 import 'widgets/newsletter_popup.dart';
 import 'widgets/toast.dart';
@@ -65,7 +70,7 @@ class _AOneGo9AppState extends State<AOneGo9App> with WidgetsBindingObserver {
           T.applyBrightness(brightness);
 
           return MaterialApp(
-            title: 'AOneGo9 — Modeling Agency & Production House',
+            title: 'AOneGo9 — Artists, Businesses, Events & Brands',
             debugShowCheckedModeBanner: false,
             scrollBehavior: const _AppScrollBehavior(),
             theme: _themeFor(brightness),
@@ -205,6 +210,21 @@ class _Root extends StatelessWidget {
         break;
       case 'advertise':
         body = const AdvertiseScreen();
+        break;
+      case 'shoots':
+        body = const ShootsScreen();
+        break;
+      case 'campaigns':
+        body = const CampaignsScreen();
+        break;
+      case 'onboard':
+        body = const OnboardScreen();
+        break;
+      case 'academy':
+        body = const AcademyScreen();
+        break;
+      case 'planner':
+        body = const PlannerScreen();
         break;
       case 'artists':
       case 'vendors':

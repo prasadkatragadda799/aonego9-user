@@ -32,6 +32,33 @@ void main() {
       expect(catIdFromBackend('Modelling Academy'), 'academy');
     });
 
+    test('maps the profile categories from the platform requirements', () {
+      expect(catIdFromBackend('Celebrity'), 'celebrity');
+      expect(catIdFromBackend('Film Director'), 'director');
+      expect(catIdFromBackend('Casting Director'), 'castingDirector');
+      expect(catIdFromBackend('Instagram Influencer'), 'influencer');
+      expect(catIdFromBackend('Industry Expert'), 'expert');
+      expect(catIdFromBackend('Production House'), 'productionHouse');
+      expect(catIdFromBackend('Modelling Agency'), 'agency');
+      expect(catIdFromBackend('Talent Show Organiser'), 'organiser');
+      expect(catIdFromBackend('Event Organizer'), 'organiser');
+      expect(catIdFromBackend('University'), 'college');
+      expect(catIdFromBackend('Dance Choreographer'), 'coach');
+      expect(catIdFromBackend('Brand'), 'brand');
+      expect(catIdFromBackend('Mall'), 'mall');
+      expect(catIdFromBackend('Shopping Mall'), 'mall');
+      expect(catIdFromBackend('Digital Marketing Agency'), 'adAgency');
+      expect(catIdFromBackend('Caterer'), 'localVendor');
+    });
+
+    test('word-level matches do not leak into unrelated strings', () {
+      // "small" contains "mall"; a five-star hotel is not a celebrity.
+      expect(catIdFromBackend('Small Photo Studio'), 'studio');
+      expect(catIdFromBackend('Five Star Hotel'), 'hotel');
+      // The original event mapping still holds.
+      expect(catIdFromBackend('Wedding Planner'), 'events');
+    });
+
     test('falls back rather than throwing on junk', () {
       expect(catIdFromBackend(''), 'modelF');
       expect(catIdFromBackend('   '), 'modelF');

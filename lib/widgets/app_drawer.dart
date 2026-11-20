@@ -65,8 +65,8 @@ class AppDrawer extends StatelessWidget {
                     const _SectionLabel('Discover'),
                     _Item(
                       icon: Icons.auto_stories_outlined,
-                      label: 'Newsletter',
-                      hint: 'What\'s happening & trends',
+                      label: 'News & media',
+                      hint: 'City, India & international',
                       active: app.view == 'newsletter',
                       onTap: () => _go(context, app, 'newsletter'),
                     ),
@@ -87,9 +87,37 @@ class AppDrawer extends StatelessWidget {
                     _Item(
                       icon: Icons.event_outlined,
                       label: 'Events',
-                      hint: 'Castings, open houses, weeks',
+                      hint: 'Shows, fests, entertainment & education',
                       active: app.view == 'events',
                       onTap: () => _go(context, app, 'events'),
+                    ),
+                    _Item(
+                      icon: Icons.photo_camera_outlined,
+                      label: 'Shoots',
+                      hint: 'Artist portfolio & personal shoots',
+                      active: app.view == 'shoots',
+                      onTap: () => _go(context, app, 'shoots'),
+                    ),
+                    _Item(
+                      icon: Icons.how_to_vote_outlined,
+                      label: 'Campaigns & offers',
+                      hint: 'Vote, register interest, coupons',
+                      active: app.view == 'campaigns',
+                      onTap: () => _go(context, app, 'campaigns'),
+                    ),
+                    _Item(
+                      icon: Icons.account_balance_outlined,
+                      label: 'Open School',
+                      hint: 'Courses & admissions',
+                      active: app.view == 'academy',
+                      onTap: () => _go(context, app, 'academy'),
+                    ),
+                    _Item(
+                      icon: Icons.auto_awesome_outlined,
+                      label: 'Event planner',
+                      hint: 'AI plans, guests & accounts',
+                      active: app.view == 'planner',
+                      onTap: () => _go(context, app, 'planner'),
                     ),
                     _Item(
                       icon: Icons.school_outlined,
@@ -125,6 +153,13 @@ class AppDrawer extends StatelessWidget {
                       hint: app.isLoggedIn ? 'Bookings & subscription' : 'Track inquiries',
                       active: app.view == 'account' || app.view == 'login',
                       onTap: () => _go(context, app, 'account'),
+                    ),
+                    _Item(
+                      icon: Icons.add_business_outlined,
+                      label: 'List on AOneGo9',
+                      hint: 'Businesses, organisations, schools',
+                      active: app.view == 'onboard',
+                      onTap: () => _go(context, app, 'onboard'),
                     ),
                     _Item(
                       icon: Icons.storefront_outlined,

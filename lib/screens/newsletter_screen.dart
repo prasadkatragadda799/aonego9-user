@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../widgets/program_kit.dart';
 import '../theme/tokens.dart';
 import '../state/app_state.dart';
 import '../data/directory.dart';
@@ -42,6 +43,18 @@ class NewsletterScreen extends StatelessWidget {
               const MediaWatch(),
             ] else ...[
               const SizedBox(height: 16),
+              // Where the news is from — the browsing city, across India, or
+              // international.
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final sc in [
+                  ('all', 'Everywhere', '🌐'),
+                  ('city', app.location == 'All India' ? 'My city' : app.location, '📍'),
+                  ('india', 'All India', '🇮🇳'),
+                  ('international', 'International', '✈️'),
+                ])
+                  PickChip(label: sc.$2, icon: sc.$3, active: app.newsScope == sc.$1, onTap: () => app.setNewsScope(sc.$1)),
+              ]),
+              const SizedBox(height: 12),
               // Industry verticals — fashion, film, music, agencies, modelling,
               // production houses, events and industry bodies.
               _VerticalFilter(

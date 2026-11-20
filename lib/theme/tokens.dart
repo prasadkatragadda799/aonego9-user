@@ -130,11 +130,20 @@ class T {
     // talent
     'modelF': Color(0xFFC898AA),
     'modelM': Color(0xFF8898B6),
+    // stars & experts
+    'celebrity': Color(0xFFD8B870),
+    'director': Color(0xFF9AA4C8),
+    'castingDirector': Color(0xFFC890A0),
+    'influencer': Color(0xFFB898D0),
+    'expert': Color(0xFF90B8B0),
     // production
     'photo': Color(0xFFC4B098),
     'video': Color(0xFF7C9EC8),
     'studio': Color(0xFFA8B8C4),
     'events': Color(0xFFC4A870),
+    'productionHouse': Color(0xFF8CA8C8),
+    'agency': Color(0xFFC8A0B0),
+    'organiser': Color(0xFFD0A878),
     // post & design
     'editVideo': Color(0xFF8FB0C0),
     'editVfx': Color(0xFFA898C8),
@@ -147,20 +156,29 @@ class T {
     'designer': Color(0xFFC4A0C0),
     'clothShop': Color(0xFFB8A888),
     'jewellery': Color(0xFFD4BC80),
+    // brands & business
+    'brand': Color(0xFFC8B080),
+    'mall': Color(0xFFA8B890),
+    'adAgency': Color(0xFFC09890),
+    'localVendor': Color(0xFF98B0A0),
     // venues
     'venue': Color(0xFF7DB5A0),
     // hospitality
     'hotel': Color(0xFF88B0A0),
     // academy
     'academy': Color(0xFF98A8C8),
+    'college': Color(0xFF8CA0C0),
+    'coach': Color(0xFFB8A0C8),
   };
 
   static const Map<String, Color> _divisionAccentDark = {
     'talent': Color(0xFFC898AA),
+    'stars': Color(0xFFD8B870),
     'crew': Color(0xFF7C9EC8),
     'post': Color(0xFFA898C8),
     'beauty': Color(0xFFD09AA8),
     'fashion': Color(0xFFC4A0C0),
+    'business': Color(0xFFC8B080),
     'spaces': Color(0xFF7DB5A0),
     'hospitality': Color(0xFF88B0A0),
     'education': Color(0xFF98A8C8),

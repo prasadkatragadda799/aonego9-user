@@ -22,6 +22,11 @@ import 'package:aonego9_user/screens/browse_screen.dart';
 import 'package:aonego9_user/screens/wedding_screen.dart';
 import 'package:aonego9_user/screens/hub_screen.dart';
 import 'package:aonego9_user/screens/advertise_screen.dart';
+import 'package:aonego9_user/screens/shoots_screen.dart';
+import 'package:aonego9_user/screens/campaigns_screen.dart';
+import 'package:aonego9_user/screens/onboard_screen.dart';
+import 'package:aonego9_user/screens/academy_screen.dart';
+import 'package:aonego9_user/screens/planner_screen.dart';
 
 final sample = <String, dynamic>{
   'id': 'x1', 'cat': 'photo', 'name': 'Rhea Kapoor Photography & Films Studio', 'loc': 'Andheri West, Mumbai',
@@ -57,6 +62,11 @@ void main() {
     'profile': () => ProfileScreen(profile: sample),
     'account': () => const AccountScreen(),
     'plans': () => const SubscriptionScreen(),
+    'shoots': () => const ShootsScreen(),
+    'campaigns': () => const CampaignsScreen(),
+    'onboard': () => const OnboardScreen(),
+    'academy': () => const AcademyScreen(),
+    'planner': () => const PlannerScreen(),
   };
 
   for (final w in [320.0, 375.0, 768.0, 1280.0]) {

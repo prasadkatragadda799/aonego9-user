@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../widgets/notification_prefs.dart';
 import '../theme/tokens.dart';
 import '../data/user_repository.dart';
 import '../state/app_state.dart';
@@ -130,6 +131,8 @@ class _AccountScreenState extends State<AccountScreen> {
                       ]),
                     ),
                   const HelpPanel(),
+                  const NotificationPrefsPanel(),
+                  const AccountShortcuts(),
                 ]),
               ),
             ),

@@ -6,6 +6,7 @@ import '../data/api_client.dart';
 import '../data/directory.dart';
 import '../data/editorial.dart';
 import '../data/geo.dart';
+import '../data/programs.dart';
 import '../data/taxonomy.dart';
 import '../data/user_repository.dart';
 import '../data/vendor_profile_utils.dart';
@@ -43,7 +44,7 @@ class Inquiry {
 
 /// AppState — direct port of App()'s useState machine.
 class AppState extends ChangeNotifier {
-  String view = 'browse'; // browse | wedding | artists | vendors | advertise | profile | vendor-auth | newsletter | events | about | partners | team | sessions | connect | login | account | subscription
+  String view = 'browse'; // browse | shoots | campaigns | onboard | academy | planner | wedding | artists | vendors | advertise | profile | vendor-auth | newsletter | events | about | partners | team | sessions | connect | login | account | subscription
   Map<String, dynamic>? selectedProfile;
   NewsletterIssue? selectedIssue;
 
@@ -354,10 +355,28 @@ class AppState extends ChangeNotifier {
   List<NewsletterIssue> get happeningIssues => _byVertical('happening');
   List<NewsletterIssue> get trendIssues => _byVertical('trend');
 
-  /// Issues of one kind, narrowed to [newsVertical] when a vertical is picked.
+  /// Where the digest is scoped: all | city | india | international.
+  /// 'city' means the browsing [location] (a city or a state).
+  String newsScope = 'all';
+
+  void setNewsScope(String s) {
+    if (newsScope == s) return;
+    newsScope = s;
+    notifyListeners();
+  }
+
+  bool _inScope(NewsletterIssue n) => switch (newsScope) {
+        'city' => n.scope == 'city' && GeoIndex.matches(selected: location, listingCity: n.city),
+        'india' => n.scope != 'international',
+        'international' => n.scope == 'international',
+        _ => true,
+      };
+
+  /// Issues of one kind, narrowed to [newsVertical] and [newsScope].
   List<NewsletterIssue> _byVertical(String kind) => _newsletters
       .where((n) => n.kind == kind)
       .where((n) => newsVertical == 'all' || n.vertical == newsVertical)
+      .where(_inScope)
       .toList();
 
   /// Verticals that actually have a story behind them, so the filter row never
@@ -828,6 +847,10 @@ class AppState extends ChangeNotifier {
     fetchPlatformEvents();
     fetchNewsletters();
     fetchDirectory();
+    fetchPrograms();
+    _restoreNotebooks();
+    _restoreNotificationPrefs();
+    _restoreVotes();
     _restoreThemeMode();
     _restoreShortlist();
     restoreSession();
@@ -886,6 +909,11 @@ class AppState extends ChangeNotifier {
       // ?go=advertise is the link the desk sends to businesses; the hubs
       // and the wedding page are worth sharing on their own too.
       case 'advertise':
+      case 'shoots':
+      case 'campaigns':
+      case 'onboard':
+      case 'academy':
+      case 'planner':
       case 'artists':
       case 'vendors':
       case 'wedding':
@@ -1086,6 +1114,250 @@ class AppState extends ChangeNotifier {
     } catch (_) {
       showToast('Could not register', 'Try again in a moment', '⚠️');
       return false;
+    }
+  }
+
+  // ── Programmes: campaigns, offers, Open School ─────────────────
+
+  List<Campaign> _campaigns = [];
+  List<Offer> _offers = [];
+  List<Course> _courses = [];
+  bool programsLoading = true;
+  List<Campaign> get campaigns => _campaigns;
+  List<Offer> get offers => _offers;
+  List<Course> get courses => _courses;
+
+  /// Which campaign tab the Campaigns page opens on: campaigns | offers.
+  String campaignsTab = 'campaigns';
+
+  /// Which shoot category the Shoots page opens on: portfolio | personal.
+  String shootCategory = 'portfolio';
+
+  /// The profile type the onboarding page has pre-selected, if any.
+  String? onboardType;
+
+  Future<void> fetchPrograms() async {
+    // Capped so an unresponsive backend shows the empty state in seconds,
+    // not after the client's full 30s GET timeout.
+    Future<List<Map<String, dynamic>>> capped(Future<List<Map<String, dynamic>>> f) =>
+        f.timeout(const Duration(seconds: 15), onTimeout: () => const []);
+    final r = await Future.wait([capped(_repo.campaigns()), capped(_repo.offers()), capped(_repo.courses())]);
+    _campaigns = r[0].map(Campaign.fromJson).where((c) => c.title.isNotEmpty).toList();
+    _offers = r[1].map(Offer.fromJson).where((o) => o.title.isNotEmpty).toList();
+    _courses = r[2].map(Course.fromJson).where((c) => c.title.isNotEmpty).toList();
+    programsLoading = false;
+    notifyListeners();
+  }
+
+  void openCampaigns([String tab = 'campaigns']) {
+    campaignsTab = tab;
+    view = 'campaigns';
+    notifyListeners();
+  }
+
+  void setCampaignsTab(String tab) {
+    if (campaignsTab == tab) return;
+    campaignsTab = tab;
+    notifyListeners();
+  }
+
+  void openShoots([String category = 'portfolio']) {
+    shootCategory = category;
+    view = 'shoots';
+    notifyListeners();
+  }
+
+  void setShootCategory(String c) {
+    if (shootCategory == c) return;
+    shootCategory = c;
+    notifyListeners();
+  }
+
+  void openOnboard([String? type]) {
+    onboardType = type;
+    view = 'onboard';
+    notifyListeners();
+  }
+
+  // Votes cast on this device, so a visitor sees their own vote and cannot
+  // stack votes by tapping twice. The server is still the source of truth
+  // for the totals.
+  final Map<String, String> _myVotes = {};
+  final Set<String> _myInterest = {};
+  static const _votesKey = 'campaign_votes_v1';
+  static const _interestKey = 'campaign_interest_v1';
+  String? myVote(String campaignId) => _myVotes[campaignId];
+  bool hasRegisteredInterest(String campaignId) => _myInterest.contains(campaignId);
+
+  Future<void> _restoreVotes() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_votesKey);
+      if (raw != null) {
+        final m = jsonDecode(raw);
+        if (m is Map) _myVotes.addAll({for (final e in m.entries) '${e.key}': '${e.value}'});
+      }
+      _myInterest.addAll(prefs.getStringList(_interestKey) ?? const []);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<bool> voteCampaign(Campaign c, String option) async {
+    if (_myVotes.containsKey(c.id)) return false;
+    try {
+      await _repo.voteCampaign(c.id, {
+        'option': option,
+        'city': location,
+        if (currentUser != null) 'email': '${currentUser!['email'] ?? ''}',
+      });
+      _myVotes[c.id] = option;
+      notifyListeners();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_votesKey, jsonEncode(_myVotes));
+      } catch (_) {}
+      showToast('Vote counted', option.isEmpty ? c.title : '$option · ${c.title}', '🗳️');
+      return true;
+    } catch (_) {
+      showToast('Could not record your vote', 'Try again in a moment', '⚠️');
+      return false;
+    }
+  }
+
+  Future<bool> registerCampaignInterest(Campaign c, Map<String, dynamic> payload) async {
+    try {
+      await _repo.registerCampaignInterest(c.id, {...payload, 'campaign_title': c.title, 'kind': c.kind});
+      _myInterest.add(c.id);
+      notifyListeners();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList(_interestKey, _myInterest.toList());
+      } catch (_) {}
+      showToast('You\'re on the list', '${c.title} — the desk will reach out before it opens', '✨');
+      return true;
+    } catch (_) {
+      showToast('Could not register', 'Try again in a moment', '⚠️');
+      return false;
+    }
+  }
+
+  // ── Event planner & notebooks ──────────────────────────────────
+
+  final List<Notebook> notebooks = [];
+  static const _notebooksKey = 'notebooks_v1';
+
+  Future<void> _restoreNotebooks() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_notebooksKey);
+      if (raw != null) {
+        notebooks
+          ..clear()
+          ..addAll(Notebook.decodeAll(raw));
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> saveNotebooks() async {
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_notebooksKey, Notebook.encodeAll(notebooks));
+    } catch (_) {}
+  }
+
+  Notebook addNotebook(Notebook nb) {
+    notebooks.insert(0, nb);
+    saveNotebooks();
+    return nb;
+  }
+
+  void deleteNotebook(String id) {
+    notebooks.removeWhere((n) => n.id == id);
+    saveNotebooks();
+  }
+
+  /// True when the last plan came from the backend's AI endpoint.
+  bool lastPlanFromAi = false;
+
+  /// Builds a plan. Asks the AI endpoint first; when it is unavailable (or
+  /// returns something we cannot read) the on-device planner answers, so the
+  /// tool always works.
+  Future<EventPlan> generatePlan({
+    required String type,
+    required int guests,
+    required double budget,
+    required String city,
+    String date = '',
+  }) async {
+    final local = EventPlanner.plan(type: type, guests: guests, budget: budget, city: city);
+    final ai = await _repo.aiEventPlan({
+      'event_type': type,
+      'guests': guests,
+      'budget': budget,
+      'city': city,
+      'date': date,
+    });
+    lastPlanFromAi = false;
+    if (ai != null) {
+      final timeline = ((ai['timeline'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((m) => PlanStep('${m['when'] ?? ''}', '${m['task'] ?? ''}'))
+          .where((s) => s.task.isNotEmpty)
+          .toList();
+      final checklist = ((ai['checklist'] as List?) ?? const []).map((e) => '$e').where((s) => s.isNotEmpty).toList();
+      final tips = ((ai['tips'] as List?) ?? const []).map((e) => '$e').where((s) => s.isNotEmpty).toList();
+      if (timeline.isNotEmpty || checklist.isNotEmpty) {
+        lastPlanFromAi = true;
+        return EventPlan(
+          type: type,
+          guests: guests,
+          budget: budget,
+          city: city,
+          budgetLines: local.budgetLines,
+          timeline: timeline.isEmpty ? local.timeline : timeline,
+          checklist: checklist.isEmpty ? local.checklist : checklist,
+          tips: tips.isEmpty ? local.tips : tips,
+        );
+      }
+    }
+    return local;
+  }
+
+  // ── Notification preferences ───────────────────────────────────
+
+  final Map<String, bool> notificationPrefs = {for (final k in notificationStreams.keys) k: true};
+  static const _notifKey = 'notif_prefs_v1';
+
+  Future<void> _restoreNotificationPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_notifKey);
+      if (raw == null) return;
+      final m = jsonDecode(raw);
+      if (m is Map) {
+        for (final e in m.entries) {
+          if (notificationPrefs.containsKey(e.key)) notificationPrefs['${e.key}'] = e.value == true;
+        }
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> setNotificationPref(String key, bool on) async {
+    notificationPrefs[key] = on;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_notifKey, jsonEncode(notificationPrefs));
+    } catch (_) {}
+    if (isLoggedIn) {
+      try {
+        await _repo.saveNotificationPrefs(Map.of(notificationPrefs));
+      } catch (_) {
+        // Kept on the device; synced next time the endpoint answers.
+      }
     }
   }
 
